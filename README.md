@@ -1,30 +1,52 @@
 # Performance Report Assistant
 
-一个面向中文职场汇报的 Codex / Claude Code skill，用来把周报、git commit、项目材料和公司 Excel 模板整理成可提交的工作汇报。
+An open-source Claude Code / Codex skill for turning weekly notes, git commits, work logs, and Excel templates into polished performance reports.
 
-它特别适合这些场景：
+This skill is designed for people who need to write recurring work updates or performance reviews, especially when the final output must fit a fixed company spreadsheet template.
 
-- 周报总结
-- 月度绩效自评
-- 季度复盘
-- 晋升 / 述职材料
-- 直属领导或总部领导汇报
-- 面向甲方、客户、非专业对象的进度同步
-- 保留公司原始 Excel 模板样式的绩效表填写
+## What It Helps With
 
-## 为什么做这个 skill
+- Weekly work summaries
+- Monthly performance self-reviews
+- Quarterly business or project reviews
+- Promotion review and career-growth narratives
+- Manager, leadership, or headquarters updates
+- Customer-facing progress updates
+- Excel-based performance forms where formatting must be preserved
 
-很多公司的绩效汇报不是写一篇文章，而是填写固定 Excel 表。不同部门模板不同，用户往往需要先从企业微信等地方整理周报，再手动复制到 AI 生成结果里，最后还要把内容重新粘回原始 Excel 模板。
+## Why This Exists
 
-这个 skill 的目标是降低这部分操作成本：
+Many workplace reports are not written from scratch. They are assembled from scattered evidence:
 
-- 用采访式流程一步步引导用户，而不是一上来要求准备所有材料。
-- 先读取 Excel 模板，列出计划修改的位置，等用户确认后再写入。
-- 尽量保留原始 Excel 的样式、合并单元格、公式、边框和表结构。
-- 支持从 git commit 中提取工作证据。
-- 根据不同汇报对象调整表达方式。
+- weekly reports,
+- project notes,
+- tickets,
+- meeting notes,
+- git commits,
+- product or engineering milestones,
+- customer feedback,
+- and fixed Excel forms.
 
-## 目录结构
+Most AI-generated spreadsheets lose the original template style, which forces users to copy the content back into their company file manually. This skill focuses on a safer workflow:
+
+1. Interview the user step by step.
+2. Inspect the Excel template before editing.
+3. Explain exactly which sheets, cells, or sections will be changed.
+4. Wait for user confirmation.
+5. Fill a copy of the original workbook.
+6. Return the final file path.
+
+## Key Features
+
+- Guided interview workflow for first-time users
+- Audience-aware writing for managers, executives, partners, or customers
+- Evidence-based summaries from weekly reports and git commit history
+- Excel template preservation with `openpyxl`
+- Explicit confirmation before modifying any workbook
+- Support for Chinese workplace reports by default
+- Reusable scripts for commit collection and Excel cell filling
+
+## Repository Structure
 
 ```text
 performance-report-assistant/
@@ -40,64 +62,71 @@ performance-report-assistant/
     fill_excel_template.py
 ```
 
-## 安装方式
+## Installation
 
-把 `performance-report-assistant` 文件夹复制到你的 skills 目录。
+Copy the `performance-report-assistant` folder into your local skills directory.
 
-Claude Code / Codex 常见目录示例：
-
-```powershell
-Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<你的用户名>\.agents\skills" -Recurse -Force
-```
-
-如果你的环境使用 `.codex\skills`，也可以复制到：
+Example for Claude Code / Codex environments that use `.agents\skills`:
 
 ```powershell
-Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<你的用户名>\.codex\skills" -Recurse -Force
+Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<your-user-name>\.agents\skills" -Recurse -Force
 ```
 
-复制后建议重启 Claude Code / Codex，或新开一个会话。
+If your environment uses `.codex\skills`, copy it there instead:
 
-## 使用方式
+```powershell
+Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<your-user-name>\.codex\skills" -Recurse -Force
+```
 
-安装后可以这样说：
+Restart Claude Code / Codex or open a new session after installation.
+
+## Usage
+
+After installation, ask:
 
 ```text
-使用 $performance-report-assistant，一步一步采访我，帮我完成 5 月月度绩效汇报。
+Use $performance-report-assistant to guide me step by step through a monthly performance review.
 ```
 
-如果你还没有安装，也可以直接按路径使用：
+For Chinese reports:
 
 ```text
-请使用 E:\work\anche_report_skill\performance-report-assistant 这个 skill，一步一步采访我，帮我完成月度绩效汇报。
+使用 $performance-report-assistant，一步一步采访我，帮我完成一份月度绩效汇报。
 ```
 
-## 推荐工作流
+You can also reference the skill by path without installing it:
 
-1. 说明要写的材料类型，例如月度绩效、周报总结、季度复盘。
-2. 说明汇报对象，例如直属领导、总部领导、客户。
-3. 提供汇报周期。
-4. 如果有 Excel 模板，先提供模板。
-5. skill 会先读取模板，并告诉你计划修改哪些工作表、单元格或区域。
-6. 你确认后，再提供周报、git 仓库路径或其他证据材料。
-7. skill 生成汇报内容，并写入模板副本。
-8. 最后返回生成文件的保存路径。
+```text
+Use E:\path\to\performance-report-assistant as the skill and guide me through a performance report.
+```
 
-## Excel 模板安全策略
+## Recommended Workflow
 
-当你提供 Excel 模板时，skill 应该：
+1. Choose the report type: weekly summary, monthly review, quarterly review, promotion review, leadership update, or customer update.
+2. Choose the audience: direct manager, senior leadership, cross-functional partners, customers, or non-expert stakeholders.
+3. Provide the reporting period.
+4. Provide an Excel template if one exists.
+5. Let the agent inspect the template and propose the exact edit plan.
+6. Confirm the edit plan.
+7. Provide evidence such as weekly notes, work logs, ticket summaries, or git repository paths.
+8. Generate the report and fill a copy of the template.
+9. Check the returned final file path.
 
-- 先读模板，不直接修改。
-- 列出计划改动的单元格或区域。
-- 说明不会改动公式、评分栏、审批栏、签名区、样式、边框、合并单元格。
-- 等你明确确认后，再生成填写后的文件。
-- 默认写入模板副本，不覆盖原始模板。
+## Excel Template Safety
 
-## 脚本说明
+When an Excel template is provided, the skill instructs the agent to:
+
+- inspect before editing,
+- list planned sheet/cell/section changes,
+- avoid formulas, score fields, approval fields, signature areas, headers, styles, borders, and merged-cell structures,
+- wait for explicit confirmation,
+- write to a copied workbook instead of overwriting the original file.
+
+## Scripts
 
 ### `collect_git_commits.py`
 
-按时间范围从一个或多个 git 仓库提取 commit，生成 Markdown 证据材料。
+Collect git commits across one or more repositories and output Markdown evidence.
 
 ```bash
 python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01 --output commits.md
@@ -105,13 +134,22 @@ python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --u
 
 ### `fill_excel_template.py`
 
-根据 JSON 映射把内容写入 Excel 模板副本，尽量保留原始样式。
+Fill mapped values into a copied Excel template while preserving workbook structure and styling.
 
 ```bash
 python scripts/fill_excel_template.py --template template.xlsx --mapping mapping.json --output filled.xlsx
 ```
 
-映射示例：
+Mapping example:
+
+```json
+{
+  "Performance Review!C6": "Completed the core project delivery and documented a reusable process.",
+  "Performance Review!C7": "Next month plan..."
+}
+```
+
+Chinese mapping example:
 
 ```json
 {
@@ -120,27 +158,25 @@ python scripts/fill_excel_template.py --template template.xlsx --mapping mapping
 }
 ```
 
-## 发布前建议
+## Search Keywords
 
-如果你要把它发布到 GitHub，建议仓库根目录增加 `.gitignore`：
+Claude Code skill, Codex skill, AI agent skill, performance review assistant, work report assistant, weekly report summarizer, Excel template filling, Chinese performance review, self-review generator, git commit work summary, stakeholder update, workplace report automation.
 
-```gitignore
-.claude/
-__pycache__/
-*.pyc
-work/
-*.tmp
-```
+## Limitations
 
-## 当前限制
+- Enterprise WeChat / WeCom reports cannot always be fetched automatically. Access depends on authorization, connectors, browser automation, or exported text.
+- Complex Excel templates may still require human confirmation for cell mapping.
+- The skill currently focuses on guided workflow and template-safe filling. More advanced automatic template scanning can be added later.
 
-- 企业微信周报无法保证自动读取，取决于你的授权、连接器或浏览器自动化能力。
-- Excel 模板识别依赖 agent 对表结构的理解。复杂模板建议先让 agent 列出拟修改单元格，并人工确认。
-- 如果需要更强的自动映射能力，可以后续增加模板扫描脚本。
+## Roadmap Ideas
 
-## 适合继续优化的方向
+- Add an Excel template scanner that proposes candidate fill cells automatically.
+- Add example fixtures for common performance-review templates.
+- Add role-specific writing modes for engineering, product, QA, operations, project management, and sales.
+- Add configurable personal or team writing-style profiles.
 
-- 自动扫描 Excel 模板并生成候选填充区域。
-- 增加真实公司模板样例测试。
-- 增加不同岗位的默认表达风格，例如研发、测试、产品、项目经理、运营。
-- 增加个人写作风格配置文件。
+## 中文简介
+
+`performance-report-assistant` 是一个面向 Claude Code / Codex 的开源 skill，用来把周报、git commit、项目记录和 Excel 模板整理成可提交的工作汇报。
+
+它的核心不是替某一个人写绩效，而是提供一个通用流程：先采访用户，再读取模板，确认拟修改位置，最后把内容写入原始模板副本，尽量保留 Excel 样式和结构。
