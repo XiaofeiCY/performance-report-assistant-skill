@@ -1,5 +1,7 @@
 # Performance Report Assistant
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 An open-source Claude Code / Codex skill for turning weekly notes, git commits, work logs, and Excel templates into polished performance reports.
 
 This skill is designed for people who need to write recurring work updates or performance reviews, especially when the final output must fit a fixed company spreadsheet template.
