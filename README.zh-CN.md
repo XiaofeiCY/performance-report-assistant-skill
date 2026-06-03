@@ -1,8 +1,10 @@
-# Performance Report Assistant (anche-report-skill)
+# Performance Report Assistant Skill
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-一个开源的 Claude Code / Codex skill，仓库名为 `anche-report-skill`，用来把周报、git commit、工作记录和 Excel 模板整理成可提交的绩效汇报、工作总结或进度同步材料。
+一个开源的 Claude Code / Codex skill，仓库名为 `performance-report-assistant-skill`，用来把周报、git commit、工作记录和 Excel 模板整理成可提交的绩效汇报、工作总结或进度同步材料。
+
+旧仓库名为 `anche-report-skill`。
 
 这个 skill 面向所有需要定期写工作汇报的人，尤其适合最终输出必须填写到固定公司 Excel 模板里的场景。
 
@@ -147,7 +149,7 @@ python scripts/fill_excel_template.py --template template.xlsx --mapping mapping
 
 ## 搜索关键词
 
-anche-report-skill、anche report skill、Performance Report Assistant、Claude Code skill、Codex skill、AI agent skill、绩效汇报助手、工作汇报助手、周报总结、Excel 模板填写、中文绩效自评、述职材料、git commit 工作总结、stakeholder update、workplace report automation。
+performance-report-assistant-skill、performance report assistant skill、performance report assistant、anche-report-skill、anche report skill、Performance Report Assistant、Claude Code skill、Codex skill、AI agent skill、绩效汇报助手、绩效报告助手、工作汇报助手、周报总结、Excel 模板填写、中文绩效自评、述职材料、git commit 工作总结、stakeholder update、workplace report automation。
 
 ## 当前限制
 
