@@ -1,8 +1,8 @@
-# Performance Report Assistant
+# Performance Report Assistant (anche-report-skill)
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-An open-source Claude Code / Codex skill for turning weekly notes, git commits, work logs, and Excel templates into polished performance reports.
+An open-source Claude Code / Codex skill, published as `anche-report-skill`, for turning weekly notes, git commits, work logs, and Excel templates into polished performance reports.
 
 This skill is designed for people who need to write recurring work updates or performance reviews, especially when the final output must fit a fixed company spreadsheet template.
 
@@ -162,7 +162,7 @@ Chinese mapping example:
 
 ## Search Keywords
 
-Claude Code skill, Codex skill, AI agent skill, performance review assistant, work report assistant, weekly report summarizer, Excel template filling, Chinese performance review, self-review generator, git commit work summary, stakeholder update, workplace report automation.
+anche-report-skill, anche report skill, Performance Report Assistant, Claude Code skill, Codex skill, AI agent skill, performance review assistant, work report assistant, weekly report summarizer, Excel template filling, Chinese performance review, self-review generator, git commit work summary, stakeholder update, workplace report automation.
 
 ## Limitations
 
