@@ -1,6 +1,6 @@
 ---
 name: performance-report-assistant
-description: Create Chinese work reports from weekly reports, git commits, notes, and Excel templates while preserving template formatting. Use when drafting monthly performance self-reviews, weekly summaries, quarterly reviews, promotion/述职 materials, leadership updates, headquarters reports, customer-facing progress updates, or filling company Excel performance forms across different departments.
+description: Create Chinese work reports from weekly reports, git commits, repository metrics, notes, and Excel templates while preserving template formatting. Use when drafting monthly performance self-reviews, weekly summaries, quarterly reviews, promotion/述职 materials, leadership updates, headquarters reports, customer-facing progress updates, or filling company Excel performance forms across different departments.
 ---
 
 # Performance Report Assistant
@@ -12,7 +12,7 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 - Preserve the user's original format whenever a template exists. Copy the `.xlsx` template and write values into cells; do not recreate the workbook from scratch unless the user explicitly asks.
 - Guide first-time users step by step. Start with a short interview instead of asking the user to provide every file up front.
 - When an Excel template is provided, inspect it first, explain which sheets/cells/sections will be changed, and wait for explicit user confirmation before writing to the workbook.
-- Minimize manual work. Prefer connected tools, exported files, pasted weekly notes, git logs, and local scripts before asking the user to reorganize content.
+- Minimize manual work. Prefer connected tools, exported files, pasted weekly notes, git logs, repository metrics, and local scripts before asking the user to reorganize content.
 - Treat the report as evidence-based. Extract facts first, then summarize impact, capability, risks, and next steps.
 - Adapt wording to audience: direct manager, senior leadership/headquarters, cross-functional partners, or external customers.
 - Ask only for missing information that materially changes the output.
@@ -65,9 +65,20 @@ If the user provides a fixed Excel template, inspect workbook sheets, merged cel
 Use the least-effort source available:
 
 - Weekly reports: use exported/pasted Enterprise WeChat weekly reports, text files, docs, or meeting notes.
-- Git commits: run `scripts/collect_git_commits.py` when the user gives repo paths and date range.
+- Git commits and repository metrics: run `scripts/collect_git_commits.py` when the user gives repo paths and date range.
 - Excel template: inspect and preserve the original `.xlsx` using spreadsheet tools or `scripts/fill_excel_template.py`.
 - Existing examples: if the user has a previous successful report, use it as the strongest style and structure reference.
+
+Repository handling:
+
+- If the user provides one or more local git repository paths, collect quantitative evidence from those repositories for the target date range.
+- When the user provides a repository path or URL, ask which branch should be inspected before collecting data unless the user already named a branch. If the user does not provide a branch, use the repository's default branch.
+- Pass the user's branch choice to `scripts/collect_git_commits.py --branch <branch>`. If no branch is provided, omit `--branch`; the script will use `origin/HEAD` when available, then the current branch as a fallback.
+- Include metrics such as commit count, changed file count, current tracked code files, current tracked code lines, code insertions/deletions, and top files by commit touch frequency.
+- Treat changed file count as all files touched in the period; treat code line count and code insertions/deletions as recognized source/config files, excluding Markdown documentation.
+- Treat these metrics as supporting evidence, not as the report's main narrative. Use them to strengthen claims about delivery volume, refactoring scope, stabilization effort, or cross-module impact.
+- If the user provides only non-repository materials such as weekly reports, meeting notes, screenshots, documents, or Excel templates, do not invent repository metrics and do not ask for a repository unless code evidence would materially improve the report.
+- If the repository date range has no commits, say that no commits were found and rely on the user's other evidence.
 
 Enterprise WeChat handling:
 
@@ -135,6 +146,7 @@ Create a compact evidence map:
 
 - Work item or theme.
 - Source evidence: weekly report date, commit hash, document, meeting, ticket, or user note.
+- Repository metrics when available: branch, commit count, touched files, top changed files, current code line count, and code insertions/deletions.
 - User role: owner, contributor, coordinator, reviewer, supporter.
 - Output: shipped feature, resolved issue, delivered document, aligned decision, reduced risk.
 - Impact: business value, customer value, efficiency, quality, risk reduction, team enablement.
@@ -194,6 +206,7 @@ Always provide a short summary of:
 
 - Inputs used.
 - Assumptions made.
+- Repository metrics used, if any.
 - Cells/sections filled.
 - Final file path.
 - Any missing evidence or questions for final polish.
@@ -202,13 +215,27 @@ Always provide a short summary of:
 
 ### collect_git_commits.py
 
-Use this when the user wants weekly or monthly work facts from local git repositories.
+Use this when the user wants weekly or monthly work facts from local git repositories. By default it outputs both a commit list and repository metrics.
 
 Example:
 
 ```bash
-python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01 --output commits.md
+python scripts/collect_git_commits.py --repo C:\path\repo --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
 ```
+
+If `--branch` is omitted, the script uses `origin/HEAD` when available, then the current branch as a fallback.
+
+It reports:
+
+- selected branch,
+- commit count,
+- changed files in the period,
+- code line changes in the period,
+- current tracked code files,
+- current tracked code lines,
+- top files by commit touch frequency.
+
+Use `--no-stats` only when the user explicitly wants a commit list without metrics.
 
 ### fill_excel_template.py
 

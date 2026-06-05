@@ -11,6 +11,9 @@ Use these default structures only when the user has no fixed template.
 ## 本周重点推进
 - [事项]：[进展]。[卡点/协作对象/下一步]
 
+## 研发证据摘要（有仓库时使用）
+- [分支]：[提交次数/涉及文件数/代码增删行/高频模块]。[说明它支撑的交付或问题闭环]
+
 ## 问题与风险
 - [问题]：[影响]。[处理动作或需要支持]
 
@@ -34,6 +37,13 @@ Use these default structures only when the user has no fixed template.
    - 结果与影响：
    - 证据来源：
 
+## 研发证据摘要（有仓库时使用）
+- 提交次数：
+- 涉及文件数：
+- 代码改动行数：
+- 当前代码规模：
+- 高频改动文件：
+
 ## 能力体现
 - 执行交付：
 - 问题解决：
@@ -55,6 +65,9 @@ Use these default structures only when the user has no fixed template.
 
 ## 关键进展
 - [结果]：[业务/组织影响]
+
+## 研发证据摘要（有仓库时使用）
+- [周期内代码证据]：[提交次数/涉及文件数/代码增删行/高频模块]。[用一句话解释它支撑了什么业务或工程结果]
 
 ## 风险与应对
 - [风险]：[影响]：[当前应对]：[需要支持]
@@ -84,6 +97,9 @@ Use these default structures only when the user has no fixed template.
 ```markdown
 ## 关键贡献
 - [高影响事项]：[本人职责]：[结果]：[组织价值]
+
+## 研发证据摘要（有仓库时使用）
+- [分支]：[提交次数/涉及文件数/代码增删行/高频模块]。[说明它体现的职责范围、技术深度或交付稳定性]
 
 ## 能力成长
 - [能力维度]：[具体证据]：[可复用经验]

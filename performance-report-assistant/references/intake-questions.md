@@ -17,7 +17,8 @@ Then ask the next question based on the answer. For new users, prefer this seque
 3. Date range.
 4. Whether a fixed template exists.
 5. Evidence sources.
-6. Emphasis and sensitive points.
+6. Repository branch, if a repository is provided and the user has not named a branch.
+7. Emphasis and sensitive points.
 
 Do not ask for template, weekly reports, git repos, and style preferences all in the first message.
 
@@ -32,6 +33,7 @@ Do not ask for template, weekly reports, git repos, and style preferences all in
 ## Evidence Questions
 
 - 有哪些周报、会议纪要、需求文档、工单、PR、git commit 可以作为依据？
+- 如果提供了代码仓库：这次统计看哪个分支？如果没有指定，我会按仓库默认分支统计。
 - 哪些工作是你主导，哪些是参与或协同？
 - 有无可量化结果：节省时间、减少问题、交付数量、上线范围、反馈评分、客户/领导反馈？
 - 如果没有指标，有无定性证据：关键节点按期完成、风险被提前暴露、流程被沉淀、问题被闭环？
