@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+import re
+import tempfile
 import subprocess
 from pathlib import Path
 
@@ -45,14 +47,38 @@ CODE_EXTENSIONS = {
 }
 
 
+REPO_URL_PATTERN = re.compile(r"^(https?://|ssh://|git@).+")
+
+
 def run_git(repo: Path, args: list[str]) -> str:
-    result = subprocess.run(["git", "-C", str(repo), *args], check=True, text=True, capture_output=True)
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        check=True,
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     return result.stdout.strip()
 
 
 def run_git_bytes(repo: Path, args: list[str]) -> bytes:
     result = subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
     return result.stdout
+
+
+def is_repo_url(repo_text: str) -> bool:
+    return bool(REPO_URL_PATTERN.match(repo_text))
+
+
+def clone_repo(repo_url: str, branch: str | None, clone_parent: Path) -> Path:
+    clone_parent.mkdir(parents=True, exist_ok=True)
+    clone_dir = clone_parent / "repo"
+    cmd = ["git", "clone"]
+    if branch:
+        cmd.extend(["--branch", branch])
+    cmd.extend([repo_url, str(clone_dir)])
+    subprocess.run(cmd, check=True, capture_output=True, encoding="utf-8", errors="replace")
+    return clone_dir
 
 
 def resolve_git_root(repo: Path) -> Path:
@@ -200,6 +226,8 @@ def build_repo_stats(repo: Path, branch: str, since: str, until: str, author: st
 
 def build_repo_section(
     repo: Path,
+    source_text: str,
+    cloned_from_url: bool,
     branch: str | None,
     since: str,
     until: str,
@@ -210,7 +238,10 @@ def build_repo_section(
     selected_branch = resolve_branch(repo, branch)
     log_text = run_git_log(repo, selected_branch, since, until, author)
     commits = log_text.splitlines() if log_text else []
-    sections = [f"## {repo.name}", "", f"- Branch: `{selected_branch}`", ""]
+    sections = [f"## {repo.name}", "", f"- Source: `{source_text}`", f"- Branch: `{selected_branch}`"]
+    if cloned_from_url:
+        sections.append("- Temporary clone: cleaned up after this script finishes")
+    sections.append("")
 
     if include_stats:
         sections.extend(build_repo_stats(repo, selected_branch, since, until, author, len(commits)))
@@ -230,7 +261,7 @@ def build_repo_section(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Collect git commits and repository metrics for report evidence.")
-    parser.add_argument("--repo", action="append", required=True, help="Repository path. Repeat for multiple repos.")
+    parser.add_argument("--repo", action="append", required=True, help="Repository path or git URL. Repeat for multiple repos.")
     parser.add_argument("--since", required=True, help="Start date, e.g. 2026-05-01.")
     parser.add_argument("--until", required=True, help="End date, e.g. 2026-06-01.")
     parser.add_argument("--branch", help="Branch or revision to inspect. Defaults to origin/HEAD, then current branch.")
@@ -239,20 +270,37 @@ def main() -> int:
     parser.add_argument("--output", help="Output Markdown file. Prints to stdout when omitted.")
     args = parser.parse_args()
 
-    sections: list[str] = []
-    for repo_text in args.repo:
-        repo = Path(repo_text).expanduser().resolve()
-        if not repo.exists():
-            raise FileNotFoundError(f"Repository does not exist: {repo}")
+    with tempfile.TemporaryDirectory(prefix="performance-report-assistant-") as temp_dir_text:
+        temp_dir = Path(temp_dir_text)
+        sections: list[str] = []
+        for index, repo_text in enumerate(args.repo, start=1):
+            cloned_from_url = is_repo_url(repo_text)
+            if cloned_from_url:
+                repo = clone_repo(repo_text, args.branch, temp_dir / f"repo-{index}")
+            else:
+                repo = Path(repo_text).expanduser().resolve()
+                if not repo.exists():
+                    raise FileNotFoundError(f"Repository does not exist: {repo}")
 
-        sections.extend(build_repo_section(repo, args.branch, args.since, args.until, args.author, not args.no_stats))
-        sections.append("")
+            sections.extend(
+                build_repo_section(
+                    repo,
+                    repo_text,
+                    cloned_from_url,
+                    args.branch,
+                    args.since,
+                    args.until,
+                    args.author,
+                    not args.no_stats,
+                )
+            )
+            sections.append("")
 
-    output = "\n".join(sections).strip() + "\n"
-    if args.output:
-        Path(args.output).write_text(output, encoding="utf-8")
-    else:
-        print(output, end="")
+        output = "\n".join(sections).strip() + "\n"
+        if args.output:
+            Path(args.output).write_text(output, encoding="utf-8")
+        else:
+            print(output, end="")
     return 0
 
 
