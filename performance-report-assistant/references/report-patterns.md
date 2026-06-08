@@ -4,6 +4,8 @@ Use these default structures only when the user has no fixed template.
 
 ## Weekly Summary
 
+If the user provides a previous weekly report, use it only to mirror section order, tone, and granularity. Replace all content with current-week evidence.
+
 ```markdown
 ## 本周完成
 - [事项]：[结果]。[必要时补充影响或范围]

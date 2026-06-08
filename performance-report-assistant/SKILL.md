@@ -12,10 +12,13 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 - Preserve the user's original format whenever a template exists. Copy the `.xlsx` template and write values into cells; do not recreate the workbook from scratch unless the user explicitly asks.
 - Guide first-time users step by step. Start with a short interview instead of asking the user to provide every file up front.
 - When an Excel template is provided, inspect it first, explain which sheets/cells/sections will be changed, and wait for explicit user confirmation before writing to the workbook.
+- Treat old reports and filled examples as references only. Never return a pasted previous report as the new report unless the user explicitly asks to reuse it unchanged.
 - Minimize manual work. Prefer connected tools, exported files, pasted weekly notes, git logs, repository metrics, and local scripts before asking the user to reorganize content.
 - Treat the report as evidence-based. Extract facts first, then summarize impact, capability, risks, and next steps.
 - Adapt wording to audience: direct manager, senior leadership/headquarters, cross-functional partners, or external customers.
 - Ask only for missing information that materially changes the output.
+- Do not produce the final report until current-period evidence has been gathered or the user explicitly confirms there is no more evidence to provide.
+- Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
 
 ## Workflow
 
@@ -33,10 +36,11 @@ After the user answers, continue one step at a time:
 
 1. Confirm report scenario.
 2. Confirm audience.
-3. Confirm date range.
-4. Ask whether there is a fixed Excel template.
+3. Confirm date range. If the user gives a relative period such as "上周", convert it to exact dates using the current date, then continue.
+4. Ask whether there is a fixed Excel template or only a previous filled report/example.
 5. Confirm where the final file should be saved.
 6. Ask for evidence sources only after the scenario, template situation, and output location are clear.
+7. If a repository is provided and no branch is named, ask for the branch before collecting repository evidence.
 
 Avoid asking more than 2-3 questions in one turn unless the user explicitly wants a checklist.
 
@@ -60,6 +64,14 @@ Identify audience:
 
 If the user provides a fixed Excel template, inspect workbook sheets, merged cells, visible labels, and existing filled examples before drafting or writing.
 
+Distinguish input types:
+
+- Fixed Excel template: a blank or reusable `.xlsx` form that should be copied and filled.
+- Previous filled report: an old weekly/monthly report, pasted text, or filled form used only as style, structure, tone, and granularity reference.
+- Current-period evidence: weekly notes, commits, repository metrics, tickets, meeting notes, user-provided facts, or other material from the target date range.
+
+If the user provides a previous filled report after being asked for a template, acknowledge it as a reference and ask for current-period evidence. Do not treat the previous report as the completed answer.
+
 ### 3. Gather Evidence
 
 Use the least-effort source available:
@@ -71,9 +83,12 @@ Use the least-effort source available:
 
 Repository handling:
 
-- If the user provides one or more local git repository paths, collect quantitative evidence from those repositories for the target date range.
-- When the user provides a repository path or URL, ask which branch should be inspected before collecting data unless the user already named a branch. If the user does not provide a branch, use the repository's default branch.
-- Pass the user's branch choice to `scripts/collect_git_commits.py --branch <branch>`. If no branch is provided, omit `--branch`; the script will use `origin/HEAD` when available, then the current branch as a fallback.
+- If the user provides one or more local git repository paths or git URLs, collect quantitative evidence from those repositories for the target date range.
+- When the user provides a repository path or URL, ask which branch should be inspected before collecting data unless the user already named a branch. Stop and wait for the branch answer if the branch is missing.
+- If the user says to use the default branch, omit `--branch`; the script will use `origin/HEAD` when available, then the current branch as a fallback.
+- Pass an explicit branch choice to `scripts/collect_git_commits.py --branch <branch>`.
+- For repository URLs, pass the URL directly to `scripts/collect_git_commits.py --repo <url>`. Do not manually clone into an arbitrary workspace location. The script clones URLs into a temporary directory and deletes the clone after it finishes.
+- After the repository path, date range, and branch/default-branch choice are known, run `scripts/collect_git_commits.py` before drafting. Do not skip repository metrics when a repository is available.
 - Include metrics such as commit count, changed file count, current tracked code files, current tracked code lines, code insertions/deletions, and top files by commit touch frequency.
 - Treat changed file count as all files touched in the period; treat code line count and code insertions/deletions as recognized source/config files, excluding Markdown documentation.
 - Treat these metrics as supporting evidence, not as the report's main narrative. Use them to strengthen claims about delivery volume, refactoring scope, stabilization effort, or cross-module impact.
@@ -147,10 +162,18 @@ Create a compact evidence map:
 - Work item or theme.
 - Source evidence: weekly report date, commit hash, document, meeting, ticket, or user note.
 - Repository metrics when available: branch, commit count, touched files, top changed files, current code line count, and code insertions/deletions.
+- Reference-only material: previous report/template used for structure or tone, clearly marked as not current-period evidence.
 - User role: owner, contributor, coordinator, reviewer, supporter.
 - Output: shipped feature, resolved issue, delivered document, aligned decision, reduced risk.
 - Impact: business value, customer value, efficiency, quality, risk reduction, team enablement.
 - Metric status: exact metric, estimated metric, qualitative evidence, or missing.
+
+Before drafting, check:
+
+- The target report period is known.
+- Current-period evidence exists, or the user explicitly said to draft with limited evidence.
+- If a repository was provided, branch/default-branch choice is known and repository metrics have been collected.
+- Any previous report is being used only for style and structure unless the user explicitly asked to reuse old content.
 
 Prefer grouping by themes over raw chronology unless the form requires dates.
 
@@ -215,7 +238,7 @@ Always provide a short summary of:
 
 ### collect_git_commits.py
 
-Use this when the user wants weekly or monthly work facts from local git repositories. By default it outputs both a commit list and repository metrics.
+Use this when the user wants weekly or monthly work facts from local git repositories or git URLs. By default it outputs both a commit list and repository metrics.
 
 Example:
 
@@ -223,11 +246,21 @@ Example:
 python scripts/collect_git_commits.py --repo C:\path\repo --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
 ```
 
+Git URL example:
+
+```bash
+python scripts/collect_git_commits.py --repo https://github.com/example/project.git --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
+```
+
 If `--branch` is omitted, the script uses `origin/HEAD` when available, then the current branch as a fallback.
+
+For git URLs, the script clones into an OS temporary directory named like `performance-report-assistant-*` and automatically deletes that clone when the script exits. Do not keep cloned repositories unless the user explicitly asks for a persistent local copy.
 
 It reports:
 
 - selected branch,
+- repository source,
+- whether a temporary URL clone was cleaned up,
 - commit count,
 - changed files in the period,
 - code line changes in the period,
