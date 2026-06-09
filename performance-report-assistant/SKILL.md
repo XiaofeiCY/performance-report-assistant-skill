@@ -1,24 +1,24 @@
 ---
 name: performance-report-assistant
-description: Create Chinese work reports from weekly reports, git commits, repository metrics, notes, and Excel templates while preserving template formatting. Use when drafting monthly performance self-reviews, weekly summaries, quarterly reviews, promotion/述职 materials, leadership updates, headquarters reports, customer-facing progress updates, or filling company Excel performance forms across different departments.
+description: Create Chinese work reports from weekly reports, git commits, repository metrics, notes, and reusable templates while preserving template formatting. Use when drafting monthly performance self-reviews, weekly summaries, quarterly reviews, promotion/述职 materials, leadership updates, headquarters reports, customer-facing progress updates, or filling company report forms and templates across Excel, Word, PowerPoint, Markdown, or other formats.
 ---
 
 # Performance Report Assistant
 
-Turn scattered work evidence into a polished Chinese report through a guided interview, preferably by filling the user's original Excel template only after the user confirms the planned edits.
+Turn scattered work evidence into a polished Chinese report through a guided interview, preferably by preserving and filling the user's original template only after the user confirms the planned edits.
 
 ## Core Principles
 
-- Preserve the user's original format whenever a template exists. Copy the `.xlsx` template and write values into cells; do not recreate the workbook from scratch unless the user explicitly asks.
+- Preserve the user's original format whenever a template exists. Copy the template and edit only intended content areas; do not recreate the artifact from scratch unless the user explicitly asks.
 - Guide first-time users step by step. Start with a short interview instead of asking the user to provide every file up front.
-- When an Excel template is provided, inspect it first, explain which sheets/cells/sections will be changed, and wait for explicit user confirmation before writing to the workbook.
+- When any fixed template is provided, inspect it first, explain which pages/slides/sheets/cells/sections will be changed, and wait for explicit user confirmation before writing to the file.
 - Treat old reports and filled examples as references only. Never return a pasted previous report as the new report unless the user explicitly asks to reuse it unchanged.
 - Minimize manual work. Prefer connected tools, exported files, pasted weekly notes, git logs, repository metrics, and local scripts before asking the user to reorganize content.
 - Treat the report as evidence-based. Extract facts first, then summarize impact, capability, risks, and next steps.
 - Adapt wording to audience: direct manager, senior leadership/headquarters, cross-functional partners, or external customers.
 - Ask only for missing information that materially changes the output.
 - Do not produce the final report until current-period evidence has been gathered or the user explicitly confirms there is no more evidence to provide.
-- Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
+- Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. For weekly work reports, default to a Monday-Friday workweek unless the user explicitly asks for a natural week or weekend coverage. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
 
 ## Workflow
 
@@ -36,11 +36,11 @@ After the user answers, continue one step at a time:
 
 1. Confirm report scenario.
 2. Confirm audience.
-3. Confirm date range. If the user gives a relative period such as "上周", convert it to exact dates using the current date, then continue.
-4. Ask whether there is a fixed Excel template or only a previous filled report/example.
+3. Confirm date range. If the user gives a relative period such as "上周", convert it to exact dates using `scripts/resolve_report_period.py`, then continue.
+4. Ask whether there is a fixed template file, a previous filled report/example, or no template.
 5. Confirm where the final file should be saved.
 6. Ask for evidence sources only after the scenario, template situation, and output location are clear.
-7. If a repository is provided and no branch is named, ask for the branch before collecting repository evidence.
+7. If a repository is provided, use all branches by default unless the user explicitly names a branch.
 
 Avoid asking more than 2-3 questions in one turn unless the user explicitly wants a checklist.
 
@@ -62,12 +62,12 @@ Identify audience:
 - Cross-functional partner: dependencies, decisions, timeline, needed input.
 - Customer or non-expert: business-facing progress, benefits, current limitations, next steps.
 
-If the user provides a fixed Excel template, inspect workbook sheets, merged cells, visible labels, and existing filled examples before drafting or writing.
+If the user provides a fixed template, inspect its structure and existing filled examples before drafting or writing. For Excel, inspect workbook sheets, merged cells, visible labels, formulas, and approval areas. For Word, inspect headings, tables, placeholders, and signature/approval blocks. For PowerPoint, inspect slide titles, layout placeholders, tables, charts, and speaker notes if relevant.
 
 Distinguish input types:
 
-- Fixed Excel template: a blank or reusable `.xlsx` form that should be copied and filled.
-- Previous filled report: an old weekly/monthly report, pasted text, or filled form used only as style, structure, tone, and granularity reference.
+- Fixed template: a blank or reusable `.xlsx`, `.docx`, `.pptx`, Markdown, or other file that should be copied and filled while preserving structure.
+- Previous filled report: an old weekly/monthly report, pasted text, or filled document used only as style, structure, tone, and granularity reference.
 - Current-period evidence: weekly notes, commits, repository metrics, tickets, meeting notes, user-provided facts, or other material from the target date range.
 
 If the user provides a previous filled report after being asked for a template, acknowledge it as a reference and ask for current-period evidence. Do not treat the previous report as the completed answer.
@@ -78,22 +78,32 @@ Use the least-effort source available:
 
 - Weekly reports: use exported/pasted Enterprise WeChat weekly reports, text files, docs, or meeting notes.
 - Git commits and repository metrics: run `scripts/collect_git_commits.py` when the user gives repo paths and date range.
-- Excel template: inspect and preserve the original `.xlsx` using spreadsheet tools or `scripts/fill_excel_template.py`.
+- Template file: inspect and preserve the original file using the appropriate tool for its format. For Excel, use spreadsheet tools or `scripts/fill_excel_template.py`; for Word or PowerPoint, use the relevant document or presentation tooling available in the environment.
 - Existing examples: if the user has a previous successful report, use it as the strongest style and structure reference.
 
 Repository handling:
 
-- If the user provides one or more local git repository paths or git URLs, collect quantitative evidence from those repositories for the target date range.
-- When the user provides a repository path or URL, ask which branch should be inspected before collecting data unless the user already named a branch. Stop and wait for the branch answer if the branch is missing.
-- If the user says to use the default branch, omit `--branch`; the script will use `origin/HEAD` when available, then the current branch as a fallback.
-- Pass an explicit branch choice to `scripts/collect_git_commits.py --branch <branch>`.
+- If the user provides one or more local git repository paths or git URLs, always collect quantitative evidence from those repositories for the target date range, regardless of report type.
+- If the user provides a repository but does not explicitly name a branch, search all branches by time range. Omit `--branch`; the script defaults to all branches.
+- If the user explicitly names a branch, pass it to `scripts/collect_git_commits.py --branch <branch>` and restrict statistics to that branch.
+- If the user explicitly asks to use all branches, pass `--all-branches`; this is equivalent to omitting `--branch`.
+- If the user asks for "我的提交" and the git author is not clear, ask for the git author name/email to pass via `--author`. If the user declines, collect all authors and label the author filter as not applied.
 - For repository URLs, pass the URL directly to `scripts/collect_git_commits.py --repo <url>`. Do not manually clone into an arbitrary workspace location. The script clones URLs into a temporary directory and deletes the clone after it finishes.
-- After the repository path, date range, and branch/default-branch choice are known, run `scripts/collect_git_commits.py` before drafting. Do not skip repository metrics when a repository is available.
+- After the repository path, date range, optional branch restriction, and optional author filter are known, run `scripts/collect_git_commits.py` before drafting. Do not skip repository metrics when a repository is available, even if the user also provided notes, a previous report, or a template.
 - Include metrics such as commit count, changed file count, current tracked code files, current tracked code lines, code insertions/deletions, and top files by commit touch frequency.
+- Also include additional useful angles when available, such as author distribution, daily commit distribution, and high-frequency modules/files.
 - Treat changed file count as all files touched in the period; treat code line count and code insertions/deletions as recognized source/config files, excluding Markdown documentation.
 - Treat these metrics as supporting evidence, not as the report's main narrative. Use them to strengthen claims about delivery volume, refactoring scope, stabilization effort, or cross-module impact.
-- If the user provides only non-repository materials such as weekly reports, meeting notes, screenshots, documents, or Excel templates, do not invent repository metrics and do not ask for a repository unless code evidence would materially improve the report.
+- If the user provides only non-repository materials such as weekly reports, meeting notes, screenshots, documents, or templates, do not invent repository metrics and do not ask for a repository unless code evidence would materially improve the report.
 - If the repository date range has no commits, say that no commits were found and rely on the user's other evidence.
+
+Date range handling:
+
+- For `weekly-summary`, default to workweek mode: Monday through Friday.
+- Resolve "上周" as the previous Monday through Friday. For example, if today is 2026-06-09, "上周" means 2026-06-01 through 2026-06-05.
+- Resolve "本周" as the current Monday through Friday. For example, if today is 2026-06-09, "本周" means 2026-06-08 through 2026-06-12.
+- Use natural week mode, Monday through Sunday, only when the user explicitly says "自然周", "包含周末", or gives dates that include weekend work.
+- Use `scripts/resolve_report_period.py --period last-week --today YYYY-MM-DD` or `--period this-week` to avoid date arithmetic mistakes.
 
 Enterprise WeChat handling:
 
@@ -108,7 +118,7 @@ Before generating files, ask where the output should be saved.
 Prefer this order:
 
 1. User-specified folder.
-2. Same folder as the Excel template, using a clear filename.
+2. Same folder as the template, using a clear filename.
 3. Current workspace `outputs/` folder if available.
 4. Current working directory as a fallback.
 
@@ -122,17 +132,18 @@ Use clear filenames that include scenario and period, for example:
 
 If the user does not choose a location, say the planned save path before creating the file and ask for confirmation when writing outside the current workspace.
 
-### 5. Inspect and Confirm Excel Template Changes
+### 5. Inspect and Confirm Template Changes
 
-When the user uploads or points to an Excel template:
+When the user uploads or points to a fixed template, read `references/template-workflow.md`. If the template is Excel, also read `references/excel-template-workflow.md`.
 
-1. Inspect the workbook before modifying it.
+1. Inspect the template before modifying it.
 2. Summarize the structure:
-   - sheet names,
+   - file type,
+   - sheet/page/slide names or headings,
    - obvious report sections,
-   - merged cell areas relevant to writing,
-   - formulas or protected/approval areas that should not be touched,
-   - candidate cells or sections for generated content.
+   - tables, placeholders, merged cells, text boxes, or slide regions relevant to writing,
+   - formulas, protected areas, charts, approval/signature blocks, or metadata areas that should not be touched,
+   - candidate cells, paragraphs, placeholders, slides, or sections for generated content.
 3. Produce a proposed change plan, such as:
 
 ```text
@@ -151,9 +162,9 @@ When the user uploads or points to an Excel template:
 请确认是否按这个方案继续。
 ```
 
-4. Wait for explicit confirmation before running `scripts/fill_excel_template.py` or writing any workbook.
+4. Wait for explicit confirmation before running any file-writing tool or writing any template copy.
 
-If the mapping is uncertain, ask the user to confirm the target columns/cells before drafting final content.
+If the mapping is uncertain, ask the user to confirm the target fields, cells, paragraphs, placeholders, slides, or sections before drafting final content.
 
 ### 6. Analyze Before Writing
 
@@ -172,7 +183,7 @@ Before drafting, check:
 
 - The target report period is known.
 - Current-period evidence exists, or the user explicitly said to draft with limited evidence.
-- If a repository was provided, branch/default-branch choice is known and repository metrics have been collected.
+- If a repository was provided, repository metrics have been collected across all branches unless the user explicitly restricted the scan to one branch.
 - Any previous report is being used only for style and structure unless the user explicitly asked to reuse old content.
 
 Prefer grouping by themes over raw chronology unless the form requires dates.
@@ -213,16 +224,16 @@ For weakly quantified work, use credible qualitative phrasing:
 
 If a template exists:
 
-1. Build a cell mapping from template labels to drafted content.
-2. Show the mapping and planned workbook changes to the user.
+1. Build a mapping from template labels/sections/placeholders to drafted content.
+2. Show the mapping and planned template changes to the user.
 3. Wait for user confirmation.
-4. Copy the original workbook.
-5. Write values into the copy with `scripts/fill_excel_template.py` or equivalent spreadsheet tooling.
-6. Verify that formatting, merged cells, sheet names, row heights, formulas, and styles remain intact.
+4. Copy the original template.
+5. Write values into the copy with the appropriate tool for the file type.
+6. Verify that formatting, layout, formulas, tables, placeholders, slide order, page structure, and styles remain intact where applicable.
 
 If no template exists:
 
-- Produce a clean default report in Markdown or Excel using `references/report-patterns.md`.
+- Produce a clean default report in Markdown, or another user-requested format, using `references/report-patterns.md`.
 - Keep sections easy to paste into company forms.
 
 Always provide a short summary of:
@@ -230,7 +241,7 @@ Always provide a short summary of:
 - Inputs used.
 - Assumptions made.
 - Repository metrics used, if any.
-- Cells/sections filled.
+- Template fields/cells/sections/slides filled.
 - Final file path.
 - Any missing evidence or questions for final polish.
 
@@ -238,12 +249,18 @@ Always provide a short summary of:
 
 ### collect_git_commits.py
 
-Use this when the user wants weekly or monthly work facts from local git repositories or git URLs. By default it outputs both a commit list and repository metrics.
+Use this whenever the user provides local git repositories or git URLs as evidence. By default it outputs both a commit list and repository metrics.
 
 Example:
 
 ```bash
 python scripts/collect_git_commits.py --repo C:\path\repo --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
+```
+
+All-branches example:
+
+```bash
+python scripts/collect_git_commits.py --repo C:\path\repo --all-branches --author "Your Name" --since 2026-05-01 --until 2026-05-31 --output commits.md
 ```
 
 Git URL example:
@@ -252,13 +269,15 @@ Git URL example:
 python scripts/collect_git_commits.py --repo https://github.com/example/project.git --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
 ```
 
-If `--branch` is omitted, the script uses `origin/HEAD` when available, then the current branch as a fallback.
+When `--branch` is omitted, commit statistics search all branches by default to avoid missing work spread across feature, release, and hotfix branches. If both `--all-branches` and `--branch` are provided, commit statistics use all branches while current code size is measured from the selected/default branch.
+
+If a branch is provided, statistics are restricted to that branch.
 
 For git URLs, the script clones into an OS temporary directory named like `performance-report-assistant-*` and automatically deletes that clone when the script exits. Do not keep cloned repositories unless the user explicitly asks for a persistent local copy.
 
 It reports:
 
-- selected branch,
+- selected scan scope,
 - repository source,
 - whether a temporary URL clone was cleaned up,
 - commit count,
@@ -267,12 +286,28 @@ It reports:
 - current tracked code files,
 - current tracked code lines,
 - top files by commit touch frequency.
+- author distribution,
+- daily commit distribution.
 
 Use `--no-stats` only when the user explicitly wants a commit list without metrics.
 
+### resolve_report_period.py
+
+Use this before asking follow-up questions when the user gives a relative period such as "上周" or "本周".
+
+Examples:
+
+```bash
+python scripts/resolve_report_period.py --period last-week --today 2026-06-09
+python scripts/resolve_report_period.py --period this-week --today 2026-06-09
+python scripts/resolve_report_period.py --period last-week --today 2026-06-09 --week-mode natural
+```
+
+Default weekly mode is `workweek`, Monday through Friday. Use `--week-mode natural` only when the user explicitly wants Monday through Sunday.
+
 ### fill_excel_template.py
 
-Use this to preserve `.xlsx` styling by writing only cell values into a copied template.
+Use this only for Excel templates to preserve `.xlsx` styling by writing cell values into a copied template. For Word, PowerPoint, or other template formats, use the relevant document or presentation tooling instead.
 
 Mapping JSON examples:
 
@@ -304,4 +339,5 @@ python scripts/fill_excel_template.py --template template.xlsx --mapping mapping
 
 - `references/intake-questions.md`: interview questions for missing context.
 - `references/report-patterns.md`: default structures for weekly summaries, performance reviews, leadership updates, and customer progress updates.
-- `references/excel-template-workflow.md`: checklist for preserving Excel template formatting.
+- `references/template-workflow.md`: checklist for preserving fixed templates across Excel, Word, PowerPoint, Markdown, and other formats.
+- `references/excel-template-workflow.md`: Excel-specific checklist for preserving workbook formatting.

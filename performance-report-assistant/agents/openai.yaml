@@ -1,7 +1,7 @@
 interface:
   display_name: "Performance Report Assistant"
-  short_description: "Fill work reports from notes, repository metrics, and templates."
-  default_prompt: "Use $performance-report-assistant to turn my weekly reports, repository commits, and Excel template into a monthly performance report."
+  short_description: "Fill work reports from notes, repository metrics, and fixed templates."
+  default_prompt: "Use $performance-report-assistant to turn my notes, repository commits, and report template into a polished Chinese work report."
 
 policy:
   allow_implicit_invocation: true
