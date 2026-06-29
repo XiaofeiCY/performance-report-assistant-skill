@@ -244,6 +244,18 @@ python scripts/fill_excel_template.py --help
 - `agents/openai.yaml` contains a short display name, short description, default prompt, and implicit invocation policy.
 - Reference files are useful but not overly long.
 
+## Current Status Notes
+
+This document is the original execution plan. The current repository state (as of 2026-06-29) includes items not listed in the original deliverables:
+
+- `references/template-workflow.md` exists, covering multi-format template handling beyond Excel.
+- `scripts/resolve_report_period.py` exists, resolving relative date periods such as "this week", "last week", "this month", and "last month" into exact date ranges.
+- `README.md` and `README.zh-CN.md` exist and are the current user-facing documentation.
+- Script `--help` checks have been run successfully for all three scripts: `collect_git_commits.py`, `fill_excel_template.py`, and `resolve_report_period.py`.
+- Excel sample fill validation has not yet been recorded in this review.
+
+The original plan below is preserved as historical context and acceptance guidance.
+
 ## Acceptance Criteria
 
 The work is complete only when:

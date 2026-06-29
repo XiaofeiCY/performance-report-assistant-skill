@@ -60,10 +60,12 @@ performance-report-assistant/
   references/
     intake-questions.md
     report-patterns.md
+    template-workflow.md
     excel-template-workflow.md
   scripts/
     collect_git_commits.py
     fill_excel_template.py
+    resolve_report_period.py
 ```
 
 ## Installation
@@ -160,6 +162,20 @@ Chinese mapping example:
   "绩效自评!C6": "本月重点完成...",
   "绩效自评!C7": "下月计划..."
 }
+```
+
+### `resolve_report_period.py`
+
+Resolve relative periods such as "this week", "last week", "this month", and "last month" into exact date ranges. Weekly reports default to a Monday-Friday workweek unless natural-week mode is explicitly requested.
+
+```bash
+python scripts/resolve_report_period.py --period last-week --today 2026-06-09
+```
+
+Natural-week example:
+
+```bash
+python scripts/resolve_report_period.py --period last-week --today 2026-06-09 --week-mode natural
 ```
 
 ## Search Keywords

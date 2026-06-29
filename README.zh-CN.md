@@ -60,10 +60,12 @@ performance-report-assistant/
   references/
     intake-questions.md
     report-patterns.md
+    template-workflow.md
     excel-template-workflow.md
   scripts/
     collect_git_commits.py
     fill_excel_template.py
+    resolve_report_period.py
 ```
 
 ## 安装方式
@@ -145,6 +147,20 @@ python scripts/fill_excel_template.py --template template.xlsx --mapping mapping
   "绩效自评!C6": "本月重点完成...",
   "绩效自评!C7": "下月计划..."
 }
+```
+
+### `resolve_report_period.py`
+
+将"本周"、"上周"、"本月"、"上个月/上月"等相对时间描述解析为绝对日期范围。周报默认使用周一至周五的工作周，除非明确要求自然周模式。
+
+```bash
+python scripts/resolve_report_period.py --period 上周 --today 2026-06-09
+```
+
+自然周示例：
+
+```bash
+python scripts/resolve_report_period.py --period 上周 --today 2026-06-09 --week-mode natural
 ```
 
 ## 搜索关键词
