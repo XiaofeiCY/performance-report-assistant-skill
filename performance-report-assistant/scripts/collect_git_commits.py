@@ -121,6 +121,17 @@ def is_code_file(path_text: str) -> bool:
     return path.suffix.lower() in CODE_EXTENSIONS
 
 
+DATE_ONLY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def normalize_date_range(since: str, until: str) -> tuple[str, str]:
+    if DATE_ONLY.match(since):
+        since = f"{since} 00:00:00"
+    if DATE_ONLY.match(until):
+        until = f"{until} 23:59:59"
+    return since, until
+
+
 def log_scope_args(branch: str | None, all_branches: bool) -> list[str]:
     if all_branches:
         return ["--all"]
@@ -366,6 +377,8 @@ def main() -> int:
     parser.add_argument("--no-stats", action="store_true", help="Only output commit list, without repository metrics.")
     parser.add_argument("--output", help="Output Markdown file. Prints to stdout when omitted.")
     args = parser.parse_args()
+
+    args.since, args.until = normalize_date_range(args.since, args.until)
 
     use_all_branches = args.all_branches or not args.branch
 
