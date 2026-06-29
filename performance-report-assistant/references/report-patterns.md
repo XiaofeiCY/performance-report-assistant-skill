@@ -4,7 +4,7 @@ Use these default structures only when the user has no fixed template.
 
 ## Weekly Summary
 
-If the user provides a previous weekly report, use it only to mirror section order, tone, and granularity. Replace all content with current-week evidence.
+If the user provides a previous weekly report, use it only to mirror structure, formatting, indentation, line breaks, labels, bracket style, section order, tone, and granularity. Never reuse old tasks, repository names, module names, commit counts, changed-file counts, or conclusions. If the user explicitly states it is for structure/format reference only, do not ask whether its content matches the current period.
 
 ```markdown
 ## 本周完成

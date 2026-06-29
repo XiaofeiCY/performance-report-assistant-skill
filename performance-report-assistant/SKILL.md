@@ -19,6 +19,7 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 - Ask only for missing information that materially changes the output.
 - Do not produce the final report until current-period evidence has been gathered or the user explicitly confirms there is no more evidence to provide.
 - Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. For weekly work reports, default to a Monday-Friday workweek unless the user explicitly asks for a natural week or weekend coverage. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
+- When a user provides a previous report and explicitly states it is for structure/format reference only, never reuse its work items, repository names, module names, commit counts, or statistics as current-period evidence. Do not ask whether its content describes the current period. Do not infer missing repositories or modules from it. Only extract formatting signals: grouping, indentation, bullet style, line breaks, bracket/label patterns, section order, tone, and granularity.
 
 ## Workflow
 
@@ -67,7 +68,10 @@ If the user provides a fixed template, inspect its structure and existing filled
 Distinguish input types:
 
 - Fixed template: a blank or reusable `.xlsx`, `.docx`, `.pptx`, Markdown, or other file that should be copied and filled while preserving structure.
-- Previous filled report: an old weekly/monthly report, pasted text, or filled document used only as style, structure, tone, and granularity reference.
+- Previous filled report: an old weekly/monthly report, pasted text, or filled document. Its treatment depends on what the user says:
+  - If the user says it is for **structure/format reference only** (结构、缩进、换行、中括号、分组、统计行格式、口吻), mark it `reference_only`. Extract only formatting signals: grouping order, indentation, bullet style, line breaks, bracket/label patterns, section order, tone, granularity, and summary-line shape. Never reuse its work items, repository names, module names, commit counts, changed-file counts, or conclusions. Never ask "is this your current-period work". Never infer missing repositories or modules from it.
+  - If the user is **unclear** about whether it is current evidence or format reference, ask once: "这份内容是本周期实际事项，还是只作为格式/结构参考？如果只是参考，我不会复用里面的事项、仓库名或统计数字。"
+  - If the user says it **is** current-period evidence, treat it as such and cross-check with other sources.
 - Current-period evidence: weekly notes, commits, repository metrics, tickets, meeting notes, user-provided facts, or other material from the target date range.
 
 If the user provides a previous filled report after being asked for a template, acknowledge it as a reference and ask for current-period evidence. Do not treat the previous report as the completed answer.
@@ -84,11 +88,29 @@ Use the least-effort source available:
 Repository handling:
 
 - If the user provides one or more local git repository paths or git URLs, always collect quantitative evidence from those repositories for the target date range, regardless of report type.
-- If the user provides a repository but does not explicitly name a branch, search all branches by time range. Omit `--branch`; the script defaults to all branches.
+- **Before running `collect_git_commits.py`, you must confirm branch scope, author filter, and other key parameters with the user, then present a pre-execution confirmation checklist and wait for explicit approval.** The script's internal default (all branches when `--branch` is omitted) is a safety net for the script itself; the agent interview must not silently default to any branch scope.
+- If the user provides a repository but does not explicitly name a branch, ask: "代码统计前我先确认扫描范围：这些仓库要看当前分支、指定分支，还是全部分支？"
 - If the user explicitly names a branch, pass it to `scripts/collect_git_commits.py --branch <branch>` and restrict statistics to that branch.
 - If the user explicitly asks to use all branches, pass `--all-branches`; this is equivalent to omitting `--branch`.
-- If the user asks for "我的提交" and the git author is not clear, ask for the git author name/email to pass via `--author`. If the user declines, collect all authors and label the author filter as not applied.
+- If the user asks for "我的提交" or a personal weekly/performance report, ask for the git author name/email to pass via `--author`, even if you think you already know it from context. Prompt: "如果只统计你的提交，请确认 git author 名称或邮箱。可以给一个或多个；如果你要统计全部作者，我会在报告里把它标为仓库整体证据，不写成全部都是你的个人提交。"
+- If the user declines to provide an author, collect all authors, pass no `--author`, and label the result as repository-wide evidence, not personal work.
 - For repository URLs, pass the URL directly to `scripts/collect_git_commits.py --repo <url>`. Do not manually clone into an arbitrary workspace location. The script clones URLs into a temporary directory and deletes the clone after it finishes.
+- **Pre-execution confirmation checklist**: after branch, author, date range, and repository list are known, present a summary before running any script:
+
+```text
+执行代码数据统计前，请你确认以下信息：
+- 时间范围：[YYYY-MM-DD] 到 [YYYY-MM-DD]
+- 仓库：[repo A]、[repo B]
+- 分支范围：[当前分支 / 指定分支 xxx / 全部分支]
+- 作者过滤：[author 名称/邮箱 / 不过滤全部作者]
+- 统计口径：[仅个人提交 / 仓库整体证据]
+- 旧周报用途：仅参考结构，不复用内容和仓库名
+
+确认无误后我再执行统计。请明确回复"确认执行"或指出要调整的项。
+```
+
+Only run the script after the user explicitly approves (e.g. "确认执行", "可以执行", "按这个范围统计", "没问题，开始"). If the user changes any parameter, re-display the updated checklist and wait again.
+
 - After the repository path, date range, optional branch restriction, and optional author filter are known, run `scripts/collect_git_commits.py` before drafting. Do not skip repository metrics when a repository is available, even if the user also provided notes, a previous report, or a template.
 - Include metrics such as commit count, changed file count, current tracked code files, current tracked code lines, code insertions/deletions, and top files by commit touch frequency.
 - Also include additional useful angles when available, such as author distribution, daily commit distribution, and high-frequency modules/files.
@@ -96,6 +118,7 @@ Repository handling:
 - Treat these metrics as supporting evidence, not as the report's main narrative. Use them to strengthen claims about delivery volume, refactoring scope, stabilization effort, or cross-module impact.
 - If the user provides only non-repository materials such as weekly reports, meeting notes, screenshots, documents, or templates, do not invent repository metrics and do not ask for a repository unless code evidence would materially improve the report.
 - If the repository date range has no commits, say that no commits were found and rely on the user's other evidence.
+- Do not infer missing repositories from old reports. If an old report mentions repositories the user has not provided, do not ask whether those repositories should also be included, unless the user explicitly says the old report's content is also current-period evidence.
 
 Date range handling:
 
