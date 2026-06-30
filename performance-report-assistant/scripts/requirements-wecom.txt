@@ -1,0 +1,16 @@
+# Python dependencies for WeCom Smart Summary collector
+# Install: pip install -r requirements-wecom.txt
+#
+# IMPORTANT: The `interception` Python module and the Interception driver
+# are NOT installable via pip. They must be installed separately:
+#   - Download and install the Interception driver from:
+#     https://github.com/oblitum/Interception/releases
+#   - Install the Python interception module (see project references).
+#   - Reboot the machine after driver installation.
+#   - Verify: python -c "import interception; interception.auto_capture_devices()"
+
+easyocr==1.7.2
+numpy==2.4.6
+pillow==12.2.0
+pyperclip==1.11.0
+uiautomation==2.0.29

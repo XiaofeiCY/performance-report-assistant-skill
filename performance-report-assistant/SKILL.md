@@ -20,6 +20,7 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 - Do not produce the final report until current-period evidence has been gathered or the user explicitly confirms there is no more evidence to provide.
 - Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. For weekly work reports, default to a Monday-Friday workweek unless the user explicitly asks for a natural week or weekend coverage. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
 - When a user provides a previous report and explicitly states it is for structure/format reference only, never reuse its work items, repository names, module names, commit counts, or statistics as current-period evidence. Do not ask whether its content describes the current period. Do not infer missing repositories or modules from it. Only extract formatting signals: grouping, indentation, bullet style, line breaks, bracket/label patterns, section order, tone, and granularity.
+- When collecting evidence from multiple sources, treat each source independently. One source failing (e.g. WeCom automation, a remote repository) must not block other sources from completing. Record each source's state and report it to the user before drafting.
 
 ## Workflow
 
@@ -128,7 +129,65 @@ Date range handling:
 - Use natural week mode, Monday through Sunday, only when the user explicitly says "自然周", "包含周末", or gives dates that include weekend work.
 - Use `scripts/resolve_report_period.py --period last-week --today YYYY-MM-DD` or `--period this-week` to avoid date arithmetic mistakes.
 
-Enterprise WeChat handling:
+Enterprise WeChat Smart Summary:
+
+- Only trigger when the user explicitly requests it, e.g. "采集企微智能总结", "从企业微信智能总结提取", "用企微智能总结作为材料". Never auto-trigger.
+- After the user requests it, confirm the collection goal. If the report period is known, generate a dynamic default prompt using the current date range context (never hardcoded dates). Show the prompt to the user and let them confirm, edit, or provide their own.
+- The default WeCom prompt must keep the period label semantically consistent with the user's request. If the user said "上周", use either the same relative label plus dates, e.g. "总结上周（2026-06-22 至 2026-06-26）期间...", or only absolute dates, e.g. "总结 2026-06-22 至 2026-06-26 期间...". If the period label is unknown, use neutral wording such as "目标周期内". Never combine a current-week label with a previous-week date range.
+- Treat Enterprise WeChat Smart Summary as a small state machine, not a single page. The collector may encounter the normal chat page, a first-use/new-summary input page, or a previously generated history-result page. If a history-result page is visible, the correct recovery is to click the Smart Summary `+` new-summary button, wait for the input page, and verify it before pasting the prompt.
+- Do not describe Smart Summary entry detection as coordinate scanning. Enterprise WeChat windows can be resized freely; the collector must rely on verified UI Automation/OCR signals and must not perform left-menu vertical scanning or multi-point trial clicks.
+- Treat Smart Summary generation as variable-duration work. Fixed timeout is only a hard safety cap; completion should be inferred from observable UI/result signals such as result text stability, result action area, or a verified copy button.
+- Treat copying as a verified result-page operation. The copy button may be below the visible area or behind long scrollable content. The collector should search by UIA/OCR and bounded in-page scrolling after confirming the result page; it must not use right-click, fixed-coordinate copy guesses, or Ctrl+A/Ctrl+C on unknown regions as a default fallback.
+- Before any desktop automation, present a precondition checklist and wait for explicit user approval:
+
+```text
+执行企微智能总结采集前，请确认：
+- 你已登录企业微信 Windows 客户端；
+- 已打开目标聊天/群/范围所在界面；如果已经进入“智能总结”，历史结果页也可以，脚本应先点击 `+` 新建本次总结再继续；
+- 你正在电脑前监督；
+- 允许脚本使用截图、OCR、Interception 输入和剪贴板读取；
+- 脚本不会发送、删除、编辑或转发任何消息；
+- 当前企微自动化仍处于本机验证/不稳定状态，只支持已验证的企微主界面、智能总结输入页和智能总结历史结果页恢复路径；如果自动化失败，可以改用手动粘贴智能总结结果；
+- 输出路径为：[path]。
+
+确认无误后我再执行。请明确回复"确认执行企微采集"。
+```
+
+- During execution, report progress at each stage: dependency check, window location, prompt paste, button click, polling, copy, save.
+- On failure, report the stage and reason clearly. Offer retry or `--manual-input` fallback. Never continue clicking blindly on timeout.
+- If the collector cannot verify the Smart Summary entry, generation result, or copy button, stop and preserve diagnostics instead of attempting broader clicks or global copy shortcuts.
+- Do not describe the WeCom collector as stable, unattended, cross-platform, or generally capable of handling all Smart Summary UI variants. It currently follows the validated `E:/work/AgentsShare/wecom_uia_probe` flow plus a supervised recovery path for Smart Summary history-result pages, and still requires live retesting.
+- Never treat a previous Smart Summary history result as current evidence. If Smart Summary opens to a historical result, create a new summary session with the `+` button first; only the newly generated result may be saved as current-period evidence.
+- Mark WeCom Smart Summary results as `Status: needs_user_confirmation`. Remind the user before using in a report: "企微智能总结是聊天记录摘要，可能遗漏或误解上下文。我会把它作为待确认证据使用，不会直接把讨论、计划或风险提醒写成已完成工作。"
+- Use `scripts/collect_wecom_smart_summary.py` for the actual collection. Read `references/wecom-smart-summary-collector.md` for the collector's capabilities, dependencies, and safety boundaries.
+
+Multi-source evidence orchestration:
+
+- Model each evidence source as an independent unit with its own type, state, and output. Source types: `repository`, `word_document`, `weekly_draft`, `previous_report_reference`, `wecom_smart_summary`, `free_text`, `template`.
+- Track per-source state: `pending`, `confirming`, `running`, `succeeded`, `failed`, `skipped`, `needs_user_input`.
+- Process only the sources the user provides. If the user gives only repositories, do not trigger Word or WeCom collection. If the user gives repositories and Word docs, process both independently.
+- **Failure isolation**: one source failing must not stop others. Record the failure reason and continue. Do not clear successfully collected evidence. Do not silently ignore failures.
+
+```text
+企微智能总结采集失败：未找到智能总结窗口。
+我会保留这个失败状态，并继续处理已提供的仓库和文档材料。
+稍后你可以选择重试企微采集、改用手动粘贴，或先基于现有材料继续。
+```
+
+- **Pre-report evidence summary**: before drafting or filling a template, present a complete source status summary:
+
+```text
+当前材料采集状态：
+- 仓库 A：成功，输出 outputs/repo_a_commits.md
+- 仓库 B：失败，原因：认证失败
+- Word 文档：成功，已读取
+- 旧周报：仅参考结构，不复用内容
+- 企微智能总结：失败，原因：未找到智能总结窗口
+
+是否基于已成功材料继续？你也可以选择重试失败来源或补充手动材料。
+```
+
+- When a failed source could materially affect report quality, let the user choose: continue with available evidence, retry the failed source, switch to manual input, or pause.
 
 - If a WeCom/Enterprise WeChat connector or browser automation is available and authorized, try to fetch or export the relevant weekly reports directly.
 - If access is unavailable, ask the user for the smallest manual action: export the target month's weekly reports, paste them into one file, or provide screenshots/text. Do not require unnecessary reformatting.
