@@ -22,8 +22,16 @@ User deleted them intentionally because prior usage blurred file responsibilitie
 Current active execution task for Claude:
 
 ```text
+none
+```
+
+Latest completed Claude/Codex acceptance task:
+
+```text
 docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md
 ```
+
+Codex third-round acceptance passed for the documented follow-up.
 
 Previous acceptance baseline task:
 
@@ -51,15 +59,15 @@ Current WeCom automation posture:
 
 Current Excel open item:
 
-- `fill_excel_template.py` must explicitly handle or reject `.xlsx`, `.xlsm`, `.xltx`, `.xltm`, and `.xls`.
-- Macro-enabled files must not silently lose VBA content.
+- `fill_excel_template.py` now explicitly handles or rejects `.xlsx`, `.xlsm`, `.xltx`, `.xltm`, and `.xls`.
+- Real macro preservation for genuine `.xlsm` / `.xltm` files still requires a real macro workbook check before claiming strong macro-preservation guarantees.
 
 Recommended recovery sequence:
 
 1. Read `AGENTS.md`.
 2. Read this `Current Handoff Snapshot`.
-3. Read `docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md`.
-4. Use `docs/tasks/fix-wecom-safety-copy-timeout-and-doc-cleanup.zh-CN.md` only as the acceptance baseline/history for this follow-up.
+3. Read the latest completed acceptance note near the bottom: `Codex Acceptance Review Round 3: Passed for Documented Follow-up`.
+4. Use `docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md` and `docs/tasks/fix-wecom-safety-copy-timeout-and-doc-cleanup.zh-CN.md` as history/baseline unless the user explicitly asks for new implementation.
 5. If implementing, update code only after confirming with the user or after the user explicitly assigns implementation to Codex. By default, Codex writes/maintains task documents and validates Claude output.
 
 ## Current Understanding

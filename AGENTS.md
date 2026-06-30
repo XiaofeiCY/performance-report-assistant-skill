@@ -8,7 +8,7 @@
 
 1. 读本文件。
 2. 读 `docs/status.md` 顶部的 `Current Handoff Snapshot (2026-06-30)`。
-3. 读当前任务文档：
+3. 当前没有新的 Claude 返工任务；读 `docs/status.md` 顶部快照和最新第三轮验收结论即可。最新已完成验收文档：
 
 ```text
 docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md
@@ -84,20 +84,25 @@ performance-report-assistant/
 
 ## 当前最重要的工作
 
-当前重点是收缩企业微信智能总结采集器的安全边界，并同步清理项目文档入口。
+当前重点是维护企业微信智能总结采集器的安全边界，并等待用户监督下的实机验证。
 
-最新应执行任务：
+当前没有新的 Claude 返工任务。最新已完成验收文档：
 
 ```text
 docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md
 ```
 
-Claude 后续应优先按这个返工任务文档执行。原任务 `docs/tasks/fix-wecom-safety-copy-timeout-and-doc-cleanup.zh-CN.md` 作为本轮验收基准保留，不再作为当前执行入口。
+该文档已通过第三轮验收，后续只作为历史和边界说明保留。原任务 `docs/tasks/fix-wecom-safety-copy-timeout-and-doc-cleanup.zh-CN.md` 作为验收基准历史保留，不再作为当前执行入口。
 
-最新 Codex 第二轮验收结论：返工仍未通过，但只剩两个小点：
+最新 Codex 第三轮验收结论：`docs/tasks/fix-wecom-acceptance-regressions.zh-CN.md` 中记录的两个剩余返工点已经通过验收：
 
-- `click_new_summary_plus()` 必须只接受 `smart_summary_history_result_page`，即时分类为 `smart_summary_unknown_page` 时要保存诊断并停止，不能继续找 `+` 或点击。
-- `fill_excel_template.py` 的已知后缀拒绝路径必须输出简洁中文错误并非 0 退出，不能打印 Python traceback。
+- `click_new_summary_plus()` 已只接受 `smart_summary_history_result_page`，即时分类为 `smart_summary_unknown_page` 时会保存诊断并停止。
+- `fill_excel_template.py` 的已知后缀拒绝路径已输出简洁中文错误并非 0 退出，不再打印 Python traceback。
+
+当前没有新的 Claude 返工任务。后续仍未完成的事项只有：
+
+- 企业微信实机自动化仍未测试，必须由用户在本机监督下执行。
+- 真实 `.xlsm` / `.xltm` 宏文件的保宏能力仍需用真实宏工作簿验证，不能过度宣传强保宏能力。
 
 参考项目：
 
