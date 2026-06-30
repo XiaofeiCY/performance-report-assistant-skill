@@ -1,5 +1,38 @@
+# Local agent/tool state
 .claude/
+.codex/
+.agents/
+
+# Python caches and local environments
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Build/package outputs
+build/
+dist/
+*.egg-info/
+
+# Local work/output folders
 work/
+outputs/
+tmp/
+temp/
 *.tmp
+*.log
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Office temporary lock files
+~$*.docx
+~$*.xlsx
+~$*.pptx
