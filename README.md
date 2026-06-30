@@ -62,10 +62,13 @@ performance-report-assistant/
     report-patterns.md
     template-workflow.md
     excel-template-workflow.md
+    wecom-smart-summary-collector.md
   scripts/
     collect_git_commits.py
+    collect_wecom_smart_summary.py
     fill_excel_template.py
     resolve_report_period.py
+    requirements-wecom.txt
 ```
 
 ## Installation
@@ -185,7 +188,10 @@ performance-report-assistant-skill, performance report assistant skill, performa
 ## Limitations
 
 - Enterprise WeChat / WeCom reports cannot always be fetched automatically. Access depends on authorization, connectors, browser automation, or exported text.
+- Enterprise WeChat Smart Summary desktop automation (`collect_wecom_smart_summary.py`) is **Windows-only**, requires **user supervision at the keyboard**, and is **not stable, unattended, or cross-platform**. The collector cannot adapt to all Enterprise WeChat UI variants and will stop safely with diagnostics when it cannot verify the target page, generation state, or copy button. If automation fails, use `--manual-input` instead.
+- The WeCom collector does not: scan the left-side menu vertically, use right-click menus for copying, guess copy-button coordinates, or use Ctrl+A/Ctrl+C on unknown regions. Entry point discovery is limited to UIA/OCR exact match and one unstable probe fallback.
 - Complex Excel templates may still require human confirmation for cell mapping.
+- Excel filling supports `.xlsx`, `.xlsm` (macro-preserving), `.xltx`/`.xltm` (template to workbook). `.xls` is not supported and requires prior conversion.
 - The skill currently focuses on guided workflow and template-safe filling. More advanced automatic template scanning can be added later.
 
 ## Roadmap Ideas

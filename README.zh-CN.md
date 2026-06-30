@@ -62,10 +62,13 @@ performance-report-assistant/
     report-patterns.md
     template-workflow.md
     excel-template-workflow.md
+    wecom-smart-summary-collector.md
   scripts/
     collect_git_commits.py
+    collect_wecom_smart_summary.py
     fill_excel_template.py
     resolve_report_period.py
+    requirements-wecom.txt
 ```
 
 ## 安装方式
@@ -170,7 +173,10 @@ performance-report-assistant-skill、performance report assistant skill、perfor
 ## 当前限制
 
 - 企业微信 / WeCom 周报不一定能自动读取，取决于授权、连接器、浏览器自动化能力或用户导出的文本。
+- 企业微信智能总结桌面自动化（`collect_wecom_smart_summary.py`）**仅限 Windows**，必须由用户**在本机监督下执行**，**不是稳定的无人值守或跨平台能力**。采集器无法适配所有企业微信 UI 变体；无法验证目标页面、生成状态或复制按钮时会安全停止并保存诊断。自动化失败时可改用 `--manual-input` 手动输入。
+- 企微采集器不会：沿左侧菜单纵向扫描、右键菜单复制、坐标猜测复制按钮、对未知区域 Ctrl+A/Ctrl+C。入口定位仅限于 UIA/OCR 精确匹配和单个不稳定 probe 坐标。
 - 复杂 Excel 模板仍然需要人工确认单元格映射。
+- Excel 填充支持 `.xlsx`、`.xlsm`（保留宏）、`.xltx`/`.xltm`（模板转工作簿），不支持 `.xls`（需先在 Excel 中另存）。
 - 当前版本重点是采访式流程和安全填写模板；更高级的自动模板扫描能力可以后续扩展。
 
 ## 后续优化方向
