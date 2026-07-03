@@ -35,9 +35,13 @@ from typing import Any
 
 DEFAULT_PROMPT_BODY = (
     "聊天中做了哪些事情，哪些人、哪些群找到我，"
-    "梳理我在每次相关对话中产出的工作内容。"
-    "只列出真实发生的工作事项，不编造，"
-    "不把闲聊或无明确产出的对话写成工作成果；按时间或事项分条。"
+    "按真实工作对话逐条梳理。"
+    "每条尽量包含：时间或顺序、来源人/来源群、对方诉求或上下文、"
+    "我做了什么、我产出的工作内容/结论/交付物、"
+    "是否适合写入周报或报告素材。"
+    "只列真实发生的工作事项，不编造；"
+    "不把闲聊、通知或无明确产出的对话写成工作成果；"
+    "无法判断的字段标注「不明确」。"
 )
 
 GLOBAL_BUDGET_SECONDS_DEFAULT = 300
@@ -101,7 +105,7 @@ def generate_fingerprint() -> str:
     """Generate a per-run fingerprint with OCR-friendly all-digit suffix.
 
     Suffix uses only digits 0-9 to avoid EasyOCR/Chinese-OCR character confusion
-    (e.g. Z→队, R→, K→).  See docs/tasks/fix-wecom-ocr-engine-and-fingerprint-robustness.zh-CN.md.
+    (e.g. Z→队, R→, K→).
     """
     now = datetime.now()
     rand = "".join(random.choices("0123456789", k=4))
@@ -1771,6 +1775,7 @@ def _action_wait_result(
     stable_since: float = 0.0
     input_page_streak = 0  # consecutive polls showing input page structure
     result_signals_seen = False  # flip to True once body/fp/privacy/actions appear
+    current_run_result_confirmed = False  # persists: this run's result was once confirmed
 
     while True:
         wall_elapsed = time.time() - wall_start
@@ -1839,6 +1844,17 @@ def _action_wait_result(
             if body_len >= 80 or fp_visible or has_soft_fp or has_fp_prefix or has_privacy_notice or has_result_actions:
                 result_signals_seen = True
 
+        # Persist: once this run's result was trusted, keep that knowledge.
+        # Guards against long-result scenarios where signals scroll out of view.
+        if not current_run_result_confirmed:
+            _fp_prefix_ok = (paste_verified and start_clicked
+                             and has_fp_prefix
+                             and (has_privacy_notice or has_result_actions))
+            if (fp_visible or has_result_actions
+                    or (has_soft_fp and has_privacy_notice)
+                    or _fp_prefix_ok):
+                current_run_result_confirmed = True
+
         trace.log(
             stage="wait_result", state=state,
             wall_elapsed=round(wall_elapsed, 1),
@@ -1849,6 +1865,7 @@ def _action_wait_result(
             privacy_notice=has_privacy_notice,
             input_page_indicators=input_page_indicators,
             has_suggestion_cards=has_suggestion_cards,
+            current_run_result_confirmed=current_run_result_confirmed,
             action_bar_preview=action_joined[:120],
         )
 
@@ -1941,9 +1958,15 @@ def _action_wait_result(
                     fp_prefix_ok = (paste_verified and start_clicked
                                     and has_fp_prefix
                                     and (has_privacy_notice or has_result_actions))
-                    if not still_looks_like_input and (fp_visible or has_result_actions or (has_soft_fp and has_privacy_notice) or fp_prefix_ok):
+                    # current_run_result_confirmed persists across polls — handles
+                    # long-result scenarios where signals scrolled out of view.
+                    if not still_looks_like_input and (fp_visible or has_result_actions or (has_soft_fp and has_privacy_notice) or fp_prefix_ok or current_run_result_confirmed):
                         state = "copy_available"
-                        print(f"企微：主内容区文本稳定 {stable_seconds}s（{wall_elapsed:.0f}s），进入复制阶段。")
+                        if current_run_result_confirmed and not (fp_visible or has_result_actions):
+                            print(f"企微：本次结果已确认且正文稳定 {stable_seconds}s（{wall_elapsed:.0f}s），"
+                                  f"但操作区未在当前视图可见，进入复制阶段滚动查找。")
+                        else:
+                            print(f"企微：主内容区文本稳定 {stable_seconds}s（{wall_elapsed:.0f}s），进入复制阶段。")
                         return state
             else:
                 stable_since = 0.0
@@ -2112,11 +2135,16 @@ def _action_copy_result(
 ) -> str | None:
     import interception
     import pyperclip
+    import time as _time
 
     width = window_rect.right - window_rect.left
     height = window_rect.bottom - window_rect.top
-    content_cx = window_rect.left + int(width * 0.5)
-    content_cy = window_rect.top + int(height * 0.5)
+
+    t_start = _time.time()
+
+    def _elapsed(since: float | None = None) -> int:
+        """Milliseconds elapsed since *since* (or t_start)."""
+        return int((_time.time() - (since if since is not None else t_start)) * 1000)
 
     # Phase 1: Confirm result-page context before copy.
     # Exact on-screen fingerprint match is NOT a hard gate here — OCR may
@@ -2150,36 +2178,55 @@ def _action_copy_result(
     result_context_confirmed = ctx["fp_exact"] or ctx["fp_fuzzy"] or ctx["privacy_notice"] or ctx["has_result_actions"]
     trace.log(stage="copy_result", phase="fingerprint_check", **ctx,
               result_context_confirmed=result_context_confirmed)
+    trace.log(stage="copy_result", phase="copy_timing",
+              step="fingerprint_check", elapsed_ms=_elapsed())
+
+    copy_frame = frame
+    copy_frame_source = "before_copy"
+    fp_scroll_all_text: str | None = None  # saved from Phase 1 OCR for Phase 2 reuse
 
     if not result_context_confirmed and fingerprint:
         print("企微：当前视图未检测到本次结果页信号，先在结果区域滚动寻找。")
         for scroll_pass in range(1, max_scrolls + 1):
             ensure_wecom_foreground(main_hwnd)
-            interception.move_to(content_cx, content_cy)
-            time.sleep(0.15)
-            interception.click(button="left")
-            time.sleep(0.15)
+            # Wheel-only scroll: move to safe area (right side, away from
+            # center text/URLs) without clicking to avoid triggering links.
+            safe_x = window_rect.left + int(width * 0.85)
+            safe_y = window_rect.top + int(height * 0.55)
+            interception.move_to(safe_x, safe_y)
+            time.sleep(0.1)
             for _ in range(8):
                 interception.scroll('down')
             time.sleep(0.5)
 
             _verify_foreground_or_fail(main_hwnd, "WeWorkWindow", f"fp_scroll_{scroll_pass}", trace)
             scroll_frame = capture_trusted_frame(main_hwnd, window_rect, trace, f"fp_scroll_{scroll_pass}",
-                                                  region_names=["main_body"])
+                                                  region_names=["main_body", "bottom_action_bar"])
             save_frame_artifacts(scroll_frame, trace, f"fp_scroll_{scroll_pass}")
             scroll_texts = " ".join(ocr_texts_multi(scroll_frame.full_image, reader, 0.05, fingerprint=fingerprint))
             sctx = _copy_context_signals(scroll_texts)
             sctx["pass_num"] = scroll_pass
-            trace.log(stage="copy_result", phase="fp_scroll", **sctx)
+            sctx["elapsed_ms"] = _elapsed()
 
             if "智能总结" not in scroll_texts:
+                trace.log(stage="copy_result", phase="fp_scroll", **sctx)
                 print(f"企微：滚动 {scroll_pass} 次后离开智能总结页，停止搜索。")
                 break
 
             if sctx["fp_exact"] or sctx["fp_fuzzy"] or sctx["privacy_notice"] or sctx["has_result_actions"]:
                 result_context_confirmed = True
-                print(f"企微：滚动 {scroll_pass} 次后检测到本次结果页信号。")
+                copy_frame = scroll_frame
+                copy_frame_source = f"fp_scroll_{scroll_pass}"
+                fp_scroll_all_text = scroll_texts  # reuse in Phase 2, avoid re-OCR
+                trace.log(stage="copy_result", phase="fp_scroll",
+                          context_confirmed=True,
+                          use_frame=copy_frame_source,
+                          **sctx)
+                print(f"企微：滚动 {scroll_pass} 次后检测到本次结果页信号"
+                      f"（use_frame={copy_frame_source}）。")
                 break
+            else:
+                trace.log(stage="copy_result", phase="fp_scroll", **sctx)
 
             if scroll_pass > 1:
                 try:
@@ -2198,12 +2245,27 @@ def _action_copy_result(
             return None
 
     # Phase 2: Result-page context confirmed — locate and click copy.
-    # Reuse the before_copy frame (Phase 1 already captured + OCR'd it);
-    # just re-verify foreground before any click actions.
+    # copy_frame is set to the best available frame: fp_scroll_n if Phase 1
+    # confirmed context during scroll, otherwise before_copy.
     _verify_foreground_or_fail(main_hwnd, "WeWorkWindow", "copy_ready", trace)
-    copy_frame = frame
-    # Save copy_ready artifacts from the same trusted frame for trace consistency.
+    trace.log(stage="copy_result", phase="copy_search",
+              source_frame=copy_frame_source)
     save_frame_artifacts(copy_frame, trace, "copy_ready")
+
+    # Recompute all_text from the current copy_frame for action-row
+    # visibility check — copy_frame may be fp_scroll_n if Phase 1
+    # updated it, and the original all_text came from before_copy.
+    if copy_frame_source != "before_copy":
+        if fp_scroll_all_text is not None:
+            # Reuse Phase 1 full-image OCR result — same frame, same image.
+            all_text = fp_scroll_all_text
+            trace.log(stage="copy_result", phase="copy_timing",
+                      step="all_text_reuse", elapsed_ms=_elapsed(t_start),
+                      source="fp_scroll_ocr")
+        else:
+            all_text = " ".join(ocr_texts_multi(copy_frame.full_image, reader, 0.05, fingerprint=fingerprint))
+            trace.log(stage="copy_result", phase="copy_timing",
+                      step="all_text_recompute", elapsed_ms=_elapsed(t_start))
 
     tm_x, tm_y, tm_conf = template_match(copy_frame.full_image, "copy_1080p_light.png")
     if tm_x is not None:
@@ -2226,10 +2288,13 @@ def _action_copy_result(
             return result.strip()
         print("企微：模板复制后剪贴板为空或过短，继续尝试 OCR。")
 
-    # ---- Targeted main_body copy search ----
-    # The result action bar (新建智能文档 / 发送邮件 / 复制) may appear in
-    # the lower portion of main_body, below the result text.  Search it with
-    # lower OCR confidence and structural cues.
+    trace.log(stage="copy_result", phase="copy_timing",
+              step="template_match", elapsed_ms=_elapsed())
+
+    # ---- Combined main_body lower search + action-row geometry ----
+    # Single OCR pass on the lower 70% of main_body, reused for:
+    #   1) Pure "复制" detection (main_body_ocr legacy path)
+    #   2) Action-row geometry estimation (merged-text / adjacent-estimate)
     _COPY_KEYWORDS = ["复制", "拷贝"]
     _NON_COPY_ACTIONS = ["新建智能文档", "发送邮件"]
     _ACTION_SIGNALS = _COPY_KEYWORDS + _NON_COPY_ACTIONS
@@ -2239,16 +2304,25 @@ def _action_copy_result(
     mb_right = window_rect.left + int(width * 0.98)
     mb_bottom = window_rect.top + int(height * 0.85)
 
+    _action_row_visible = any(kw in all_text for kw in _ACTION_SIGNALS)
+    lower_results: list[tuple] = []  # reused across strategies
+
     if "main_body" in copy_frame.regions:
         mb = copy_frame.regions["main_body"]
         mb_h = mb.height
         # Start at 30% — action bar seen as high as 45% in live data
         lower_mb = mb.crop((0, int(mb_h * 0.30), mb.width, mb_h))
-        lower_texts = ocr_texts_multi(lower_mb, reader, 0.03, fingerprint=fingerprint)
-        lower_joined = " ".join(lower_texts)
+
+        t_mb_ocr = _time.time()
+        lower_results = ocr_all_multi(lower_mb, reader, 0.03)
+        lower_joined = " ".join([t for _, t, _ in lower_results])
         trace.log(stage="copy_result", phase="main_body_lower_search",
                   lower_texts_preview=lower_joined[:200])
-        for bbox, text, conf in ocr_all_multi(lower_mb, reader, 0.03):
+        trace.log(stage="copy_result", phase="copy_timing",
+                  step="main_body_lower_ocr", elapsed_ms=_elapsed(t_mb_ocr))
+
+        # Strategy 1: Pure "复制" detection (main_body_ocr legacy path)
+        for bbox, text, conf in lower_results:
             has_copy = any(kw in text for kw in _COPY_KEYWORDS)
             has_other = any(kw in text for kw in _NON_COPY_ACTIONS)
             if has_copy and not has_other:
@@ -2269,52 +2343,88 @@ def _action_copy_result(
                         print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
                         trace.log(stage="copy_result", method="main_body_ocr", fingerprint_match=False)
                         return None
-                    trace.log(stage="copy_result", method="main_body_ocr", result_len=len(result), fingerprint_match=True)
+                    trace.log(stage="copy_result", method="main_body_ocr", result_len=len(result),
+                              fingerprint_match=True)
                     return result.strip()
 
-    # ---- Action-row geometry estimation on current view ----
-    # Before entering the scroll loop, check if action-row signals are visible
-    # in the current view.  If so, use geometry estimation to locate "复制"
-    # without scrolling.  Handles:
-    #   A) Merged text "新建智能文档 发送邮件 复制" → estimate 3rd action position
-    #   B) Only "新建智能文档 发送邮件" visible → estimate "复制" to the right
-    _action_row_visible = any(kw in all_text for kw in _ACTION_SIGNALS)
-    if _action_row_visible and "main_body" in copy_frame.regions:
-        mb2 = copy_frame.regions["main_body"]
-        mb2_h = mb2.height
-        lower_mb2 = mb2.crop((0, int(mb2_h * 0.30), mb2.width, mb2_h))
-        lower_results = ocr_all_multi(lower_mb2, reader, 0.03)
-        est_x, est_y, est_method, est_info = _estimate_copy_from_action_row(
-            lower_results, mb_left, mb_top + int(mb2_h * 0.30),
-            mb2.width, mb2_h - int(mb2_h * 0.30), trace,
-        )
-        trace.log(stage="copy_result", phase="action_row_geometry",
-                  action_row_visible=True, method=est_method, **est_info)
-        if est_x is not None and est_y is not None:
-            print(f"企微：操作行几何定位 ({est_method}) @ ({est_x},{est_y})，点击。")
-            pyperclip.copy("")
-            ensure_wecom_foreground(main_hwnd)
-            interception.move_to(est_x, est_y)
-            time.sleep(0.1)
-            interception.click(button="left")
-            time.sleep(0.6)
-            result = pyperclip.paste()
-            if result and len(result.strip()) >= 10:
-                if fingerprint and fingerprint not in result:
-                    print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
-                    trace.log(stage="copy_result", method=est_method, fingerprint_match=False)
-                    return None
-                trace.log(stage="copy_result", method=est_method, result_len=len(result),
-                          fingerprint_match=True)
-                return result.strip()
-            print("企微：几何定位点击后剪贴板为空或过短，继续尝试滚动搜索。")
-        else:
-            print("企微：操作行信号存在但几何定位未产生有效候选，进入滚动搜索。")
+        # Strategy 2: Action-row geometry estimation (reuses lower_results)
+        if _action_row_visible:
+            est_x, est_y, est_method, est_info = _estimate_copy_from_action_row(
+                lower_results, mb_left, mb_top + int(mb_h * 0.30),
+                mb.width, mb_h - int(mb_h * 0.30), trace,
+            )
+            trace.log(stage="copy_result", phase="action_row_geometry",
+                      action_row_visible=True, **est_info)
+            trace.log(stage="copy_result", phase="copy_timing",
+                      step="action_row_geometry", elapsed_ms=_elapsed())
+            if est_x is not None and est_y is not None:
+                print(f"企微：操作行几何定位 ({est_method}) @ ({est_x},{est_y})，点击。")
+                pyperclip.copy("")
+                ensure_wecom_foreground(main_hwnd)
+                interception.move_to(est_x, est_y)
+                time.sleep(0.1)
+                interception.click(button="left")
+                time.sleep(0.6)
+                result = pyperclip.paste()
+                if result and len(result.strip()) >= 10:
+                    if fingerprint and fingerprint not in result:
+                        print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
+                        trace.log(stage="copy_result", method=est_method, fingerprint_match=False)
+                        return None
+                    trace.log(stage="copy_result", method=est_method, result_len=len(result),
+                              fingerprint_match=True)
+                    return result.strip()
+                print("企微：几何定位点击后剪贴板为空或过短，继续尝试。")
+            else:
+                print("企微：操作行信号存在但几何定位未产生有效候选，尝试底部合并区。")
     elif not _action_row_visible:
         trace.log(stage="copy_result", phase="action_row_geometry",
                   action_row_visible=False,
                   reason="no_action_signals_in_current_view")
         print("企微：当前视图未检测到操作区信号，将在滚动中搜索。")
+    # ---- Lower combined: bottom 30% of full image ----
+    # Action-row may straddle the main_body / bottom_action_bar boundary.
+    # Crop the bottom 30% of the full image as a single search area.
+    if _action_row_visible:
+        from PIL import Image
+        t_lc = _time.time()
+        combined = copy_frame.full_image.crop((
+            0,
+            int(copy_frame.full_image.height * 0.70),
+            copy_frame.full_image.width,
+            copy_frame.full_image.height,
+        ))
+        combined_results = ocr_all_multi(combined, reader, 0.03)
+        combined_text = " ".join([t for _, t, _ in combined_results])
+        trace.log(stage="copy_result", phase="copy_timing",
+                  step="lower_combined_ocr", elapsed_ms=_elapsed(t_lc))
+        if any(kw in combined_text for kw in _ACTION_SIGNALS):
+            combined_left = window_rect.left
+            combined_top = window_rect.top + int(height * 0.70)
+            est_x3, est_y3, est_method3, est_info3 = _estimate_copy_from_action_row(
+                combined_results, combined_left, combined_top,
+                combined.width, combined.height, trace,
+            )
+            trace.log(stage="copy_result", phase="action_row_geometry",
+                      action_row_visible=True, region="lower_combined", **est_info3)
+            if est_x3 is not None and est_y3 is not None:
+                print(f"企微：底部合并区几何定位 ({est_method3}) @ ({est_x3},{est_y3})，点击。")
+                pyperclip.copy("")
+                ensure_wecom_foreground(main_hwnd)
+                interception.move_to(est_x3, est_y3)
+                time.sleep(0.1)
+                interception.click(button="left")
+                time.sleep(0.6)
+                result = pyperclip.paste()
+                if result and len(result.strip()) >= 10:
+                    if fingerprint and fingerprint not in result:
+                        print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
+                        trace.log(stage="copy_result", method=est_method3, fingerprint_match=False)
+                        return None
+                    trace.log(stage="copy_result", method=est_method3, result_len=len(result),
+                              fingerprint_match=True)
+                    return result.strip()
+                print("企微：底部合并区定位点击后剪贴板为空或过短，继续尝试滚动搜索。")
 
     # ---- Scroll-assisted search ----
     # Each scroll pass saves OCR diagnostics and tries both direct "复制"
@@ -2323,13 +2433,18 @@ def _action_copy_result(
     for scroll_pass in range(max_scrolls + 1):
         if scroll_pass > 0:
             ensure_wecom_foreground(main_hwnd)
-            interception.move_to(content_cx, content_cy)
-            time.sleep(0.15)
-            interception.click(button="left")
-            time.sleep(0.15)
+            # Wheel-only scroll: move to safe area without clicking.
+            safe_x = window_rect.left + int(width * 0.85)
+            safe_y = window_rect.top + int(height * 0.55)
+            interception.move_to(safe_x, safe_y)
+            time.sleep(0.1)
             for _ in range(8):
                 interception.scroll('down')
             time.sleep(0.5)
+            trace.log(stage="copy_result", phase="scroll",
+                      method="wheel_without_click",
+                      scroll_pass=scroll_pass,
+                      elapsed_ms=_elapsed())
 
             _verify_foreground_or_fail(main_hwnd, "WeWorkWindow", f"copy_scroll_{scroll_pass}", trace)
             scroll_frame = capture_trusted_frame(main_hwnd, window_rect, trace, f"copy_scroll_{scroll_pass}",
@@ -2354,6 +2469,8 @@ def _action_copy_result(
         trace.log(stage="copy_result", phase=f"copy_scroll_{scroll_pass}_ocr",
                   scroll_pass=scroll_pass,
                   ocr_preview=scroll_texts[:200])
+        trace.log(stage="copy_result", phase="copy_timing",
+                  step=f"copy_scroll_{scroll_pass}_ocr", elapsed_ms=_elapsed())
 
         # Safety: still in smart summary?
         if scroll_pass > 0 and "智能总结" not in scroll_texts:
@@ -2395,7 +2512,7 @@ def _action_copy_result(
                 search_img.width, search_img.height, trace,
             )
             trace.log(stage="copy_result", phase=f"copy_scroll_{scroll_pass}_geometry",
-                      method=est_method2, **est_info2)
+                      **est_info2)
             if est_x2 is not None and est_y2 is not None:
                 print(f"企微：滚动 {scroll_pass} 操作行几何定位 ({est_method2}) @ ({est_x2},{est_y2})，点击。")
                 pyperclip.copy("")
@@ -2432,7 +2549,8 @@ def _action_copy_result(
             except Exception:
                 pass
 
-    trace.log(stage="copy_result", method="none", error="all_strategies_failed")
+    trace.log(stage="copy_result", method="none", error="all_strategies_failed",
+              total_elapsed_ms=_elapsed())
     return None
 
 
