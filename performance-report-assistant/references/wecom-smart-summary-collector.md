@@ -9,13 +9,13 @@ This collector is a user-supervised desktop automation path. Do not describe it 
 Latest retained successful current-period run:
 
 ```text
-outputs/wecom_runs/20260703-110152-77IJ/
+outputs/wecom_runs/20260703-160202-REJ2/
 ```
 
 Fingerprint:
 
 ```text
-PRAS-20260703-110152-4089
+PRAS-20260703-160202-4532
 ```
 
 Outputs:
@@ -30,10 +30,10 @@ Trace result:
 ```text
 automation_complete
 fingerprint_match=true
-copy method=main_body_ocr
+copy method=lower_combined ocr_direct
 ```
 
-The current collector path has completed supervised end-to-end live runs. Geometry fallback for copy action-row positioning is covered by non-live validation, but the latest retained run copied through independent `main_body_ocr`; do not claim that geometry fallback was triggered live in that run.
+The current collector path has completed supervised end-to-end live runs. The latest retained run copied through the current-frame `lower_combined` action-row path after `fp_scroll_1` confirmed the current result and action row. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
 
 ## Supported Modes
 
