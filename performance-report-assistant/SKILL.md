@@ -10,6 +10,7 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 ## Core Principles
 
 - Preserve the user's original format whenever a template exists. Copy the template and edit only intended content areas; do not recreate the artifact from scratch unless the user explicitly asks.
+- Do not turn a user's pasted template or accepted draft into a reusable/default template automatically. Templates are per user and per report scenario. Only record a reusable template after explicitly asking whether to save it as a future template for a named scenario such as 周报 or 绩效, and only when the user says yes.
 - Guide first-time users step by step. Start with a short interview instead of asking the user to provide every file up front.
 - When any fixed template is provided, inspect it first, explain which pages/slides/sheets/cells/sections will be changed, and wait for explicit user confirmation before writing to the file.
 - Treat old reports and filled examples as references only. Never return a pasted previous report as the new report unless the user explicitly asks to reuse it unchanged.
@@ -18,6 +19,7 @@ Turn scattered work evidence into a polished Chinese report through a guided int
 - Adapt wording to audience: direct manager, senior leadership/headquarters, cross-functional partners, or external customers.
 - Ask only for missing information that materially changes the output.
 - Do not produce the final report until current-period evidence has been gathered or the user explicitly confirms there is no more evidence to provide.
+- For each new report interview or content-integration session, treat the target period given in the current session as authoritative. Automatically exclude previously collected materials whose period does not match the current target period, unless the user explicitly asks to reuse them. Do not repeatedly ask the user whether an obviously period-mismatched old WeCom summary, old report, old trace, run directory, or output file should be used. Keep mismatched old materials only as historical context, validation evidence, or format/style references.
 - Resolve relative dates such as "上周", "本周", and "上个月" using the current date and timezone. For weekly work reports, default to a Monday-Friday workweek unless the user explicitly asks for a natural week or weekend coverage. State the exact absolute date range back to the user. Do not reuse examples as if they were the user's actual date range.
 - When a user provides a previous report and explicitly states it is for structure/format reference only, never reuse its work items, repository names, module names, commit counts, or statistics as current-period evidence. Do not ask whether its content describes the current period. Do not infer missing repositories or modules from it. Only extract formatting signals: grouping, indentation, bullet style, line breaks, bracket/label patterns, section order, tone, and granularity.
 - When collecting evidence from multiple sources, treat each source independently. One source failing (e.g. WeCom automation, a remote repository) must not block other sources from completing. Record each source's state and report it to the user before drafting.
@@ -77,6 +79,14 @@ Distinguish input types:
 
 If the user provides a previous filled report after being asked for a template, acknowledge it as a reference and ask for current-period evidence. Do not treat the previous report as the completed answer.
 
+Reusable template memory:
+
+- A pasted template, example report, accepted draft, or filled output is scoped to the current task by default.
+- Do not add it to project-wide defaults or future behavior unless the user explicitly agrees.
+- After a successful report, it is acceptable to ask one concise question such as: "是否把这套结构记录为你后续的【周报】模板？如果不需要，我只把它作为本次参考。" Ask this only when useful, not after every tiny edit.
+- If the user agrees, record the template with its owner/scope, report type, structure rules, and any limits. Example scope labels: `user_weekly_template`, `team_performance_template`, `customer_progress_template`.
+- If the user declines or does not answer, do not persist the template beyond the current task.
+
 ### 3. Gather Evidence
 
 Use the least-effort source available:
@@ -89,13 +99,15 @@ Use the least-effort source available:
 Repository handling:
 
 - If the user provides one or more local git repository paths or git URLs, always collect quantitative evidence from those repositories for the target date range, regardless of report type.
-- **Before running `collect_git_commits.py`, you must confirm branch scope, author filter, and other key parameters with the user, then present a pre-execution confirmation checklist and wait for explicit approval.** The script's internal default (all branches when `--branch` is omitted) is a safety net for the script itself; the agent interview must not silently default to any branch scope.
+- Before running `collect_git_commits.py`, make sure branch scope, author filter, repository list, and date range are known. If any key parameter is missing or ambiguous, present a pre-execution confirmation checklist and wait for explicit approval. The script's internal default (all branches when `--branch` is omitted) is a safety net for the script itself; the agent interview must not silently default to any branch scope.
+- If the user has already provided repository list, target period, branch scope, and author filter in the current interview, treat that as the required approval for read-only git statistics and proceed without asking for a fixed confirmation phrase. Pause only when a key parameter is missing or ambiguous.
 - If the user provides a repository but does not explicitly name a branch, ask: "代码统计前我先确认扫描范围：这些仓库要看当前分支、指定分支，还是全部分支？"
 - If the user explicitly names a branch, pass it to `scripts/collect_git_commits.py --branch <branch>` and restrict statistics to that branch.
 - If the user explicitly asks to use all branches, pass `--all-branches`; this is equivalent to omitting `--branch`.
 - If the user asks for "我的提交" or a personal weekly/performance report, ask for the git author name/email to pass via `--author`, even if you think you already know it from context. Prompt: "如果只统计你的提交，请确认 git author 名称或邮箱。可以给一个或多个；如果你要统计全部作者，我会在报告里把它标为仓库整体证据，不写成全部都是你的个人提交。"
 - If the user declines to provide an author, collect all authors, pass no `--author`, and label the result as repository-wide evidence, not personal work.
 - For repository URLs, pass the URL directly to `scripts/collect_git_commits.py --repo <url>`. Do not manually clone into an arbitrary workspace location. The script clones URLs into a temporary directory and deletes the clone after it finishes.
+- If a repository URL times out or cannot be reached, look for a local repository only as a fallback. Use a local fallback only when its `origin` remote matches the user-provided URL, and record the fallback in the evidence summary.
 - **Pre-execution confirmation checklist**: after branch, author, date range, and repository list are known, present a summary before running any script:
 
 ```text
@@ -128,37 +140,46 @@ Date range handling:
 - Resolve "本周" as the current Monday through Friday. For example, if today is 2026-06-09, "本周" means 2026-06-08 through 2026-06-12.
 - Use natural week mode, Monday through Sunday, only when the user explicitly says "自然周", "包含周末", or gives dates that include weekend work.
 - Use `scripts/resolve_report_period.py --period last-week --today YYYY-MM-DD` or `--period this-week` to avoid date arithmetic mistakes.
+- After resolving the target period, filter candidate evidence by that period. If an existing WeCom summary, JSON output, run directory, previous report, or trace clearly belongs to another period, mark it `skipped_period_mismatch` internally and do not ask the user to confirm exclusion. Ask only when the material has no discernible period or the user explicitly says to reuse earlier material.
 
 Enterprise WeChat Smart Summary:
 
-- Only trigger when the user explicitly requests it, e.g. "采集企微智能总结", "从企业微信智能总结提取", "用企微智能总结作为材料". Never auto-trigger.
+- Only trigger when the user explicitly requests it, e.g. “采集企微智能总结”, “从企业微信智能总结提取”, “用企微智能总结作为材料”. Never auto-trigger.
+- The product goal is supervised full automatic Smart Summary collection. The user authorizes and supervises, but the script should perform entering Smart Summary, creating the current summary, pasting the prompt, starting generation, waiting, copying, and saving. `--manual-input`, `--prompt-only`, and `--semi-manual` are fallback/debug paths only, not the recommended main path.
+- **New in this version**: `--probe-only` read-only diagnostic mode (capture, OCR, classify — no clicks/pastes/copies). Run this before first full-auto attempt to verify window detection and page classification.
+- Current accepted probe boundary as of 2026-07-01: ordinary Enterprise WeChat chat/group pages must classify as `main_page`, not `summary_history_page`; non-WeCom foreground must fail safely; successful probe output uses `probe.png` plus same-source region screenshots.
 - After the user requests it, confirm the collection goal. If the report period is known, generate a dynamic default prompt using the current date range context (never hardcoded dates). Show the prompt to the user and let them confirm, edit, or provide their own.
-- The default WeCom prompt must keep the period label semantically consistent with the user's request. If the user said "上周", use either the same relative label plus dates, e.g. "总结上周（2026-06-22 至 2026-06-26）期间...", or only absolute dates, e.g. "总结 2026-06-22 至 2026-06-26 期间...". If the period label is unknown, use neutral wording such as "目标周期内". Never combine a current-week label with a previous-week date range.
-- Treat Enterprise WeChat Smart Summary as a small state machine, not a single page. The collector may encounter the normal chat page, a first-use/new-summary input page, or a previously generated history-result page. If a history-result page is visible, the correct recovery is to click the Smart Summary `+` new-summary button, wait for the input page, and verify it before pasting the prompt.
-- Do not describe Smart Summary entry detection as coordinate scanning. Enterprise WeChat windows can be resized freely; the collector must rely on verified UI Automation/OCR signals and must not perform left-menu vertical scanning or multi-point trial clicks.
-- Treat Smart Summary generation as variable-duration work. Fixed timeout is only a hard safety cap; completion should be inferred from observable UI/result signals such as result text stability, result action area, or a verified copy button.
-- Treat copying as a verified result-page operation. The copy button may be below the visible area or behind long scrollable content. The collector should search by UIA/OCR and bounded in-page scrolling after confirming the result page; it must not use right-click, fixed-coordinate copy guesses, or Ctrl+A/Ctrl+C on unknown regions as a default fallback.
-- Before any desktop automation, present a precondition checklist and wait for explicit user approval:
+- The default WeCom prompt must keep the period label semantically consistent with the user's request. If the user said “上周”, use either the same relative label plus dates, e.g. “总结上周（2026-06-22 至 2026-06-26）期间...”, or only absolute dates, e.g. “总结 2026-06-22 至 2026-06-26 期间...”. If the period label is unknown, use neutral wording such as “目标周期内”. Never combine a current-week label with a previous-week date range.
+- The collector now implements a visual state machine: window normalization, region-based screenshots, regional OCR, OpenCV template matching, Interception input, per-run trace output, and a unique collection fingerprint embedded in the prompt and verified after copy.
+- OpenCV template matching requires template assets at `performance-report-assistant/assets/wecom/`. If templates are missing, the script falls back to OCR. Templates should be extracted from `--probe-only` region screenshots.
+- Treat Enterprise WeChat Smart Summary as a state machine, not a single page. Implemented states: main page, unknown Smart Summary page, history result page, input page, generating page, result page. **History result page detection runs before input page detection.**
+- Do not describe Smart Summary entry detection as coordinate scanning. Enterprise WeChat windows can be resized freely; the collector must not perform left-menu vertical scanning or multi-point trial clicks. Full-window OCR must not be the normal recognition loop.
+- Treat Smart Summary generation as variable-duration work. Fixed timeout is only a hard safety cap; completion is inferred from observable UI/result signals such as result text stability, result action area, or a verified copy button.
+- Treat copying as a verified current-result-page operation. The copy button may be below the visible area or behind long scrollable content. The collector uses template matching, regional OCR, and bounded in-page scrolling (max 6 passes) only after confirming the current result page. It must not use right-click, fixed-coordinate copy guesses, or Ctrl+A/Ctrl+C on unknown regions as a default fallback.
+- Each automatic run generates a unique collection fingerprint (`PRAS-YYYYMMDD-HHMMSS-XXXX`). The copied result must contain this fingerprint to be accepted.
+- Before any **full desktop automation**, present a precondition checklist and wait for explicit user approval (skip this for `--probe-only`, `--semi-manual`, and `--prompt-only`):
 
 ```text
 执行企微智能总结采集前，请确认：
 - 你已登录企业微信 Windows 客户端；
-- 已打开目标聊天/群/范围所在界面；如果已经进入“智能总结”，历史结果页也可以，脚本应先点击 `+` 新建本次总结再继续；
+- 已打开目标聊天/群/范围所在界面；如果已经进入”智能总结”，历史结果页也可以，脚本会先点击页内 `+` 新建本次总结再继续；
 - 你正在电脑前监督；
-- 允许脚本使用截图、OCR、Interception 输入和剪贴板读取；
+- 允许脚本使用截图、区域 OCR、OpenCV 模板匹配、Interception 输入和剪贴板读取；
+- 允许脚本最大化或调整企业微信窗口以归一化识别区域；
+- 允许 prompt 中加入本次采集指纹，用于校验复制结果属于本次生成；
 - 脚本不会发送、删除、编辑或转发任何消息；
-- 当前企微自动化仍处于本机验证/不稳定状态，只支持已验证的企微主界面、智能总结输入页和智能总结历史结果页恢复路径；如果自动化失败，可以改用手动粘贴智能总结结果；
 - 输出路径为：[path]。
 
-确认无误后我再执行。请明确回复"确认执行企微采集"。
+确认无误后我再执行。请明确回复”确认执行企微采集”。
 ```
 
-- During execution, report progress at each stage: dependency check, window location, prompt paste, button click, polling, copy, save.
-- On failure, report the stage and reason clearly. Offer retry or `--manual-input` fallback. Never continue clicking blindly on timeout.
+- Before the first full-auto run, suggest running `--probe-only` first to verify window detection and page classification without any clicking.
+- During execution, report progress at each stage: dependency check, window normalization, page classification, state machine recovery, prompt paste, button click, polling, copy, fingerprint verification, save.
+- On failure, report the stage, state, confidence, present signals, missing signals, and trace directory clearly. Offer fallback only after explaining why the automatic path stopped. Never continue clicking blindly on timeout.
 - If the collector cannot verify the Smart Summary entry, generation result, or copy button, stop and preserve diagnostics instead of attempting broader clicks or global copy shortcuts.
-- Do not describe the WeCom collector as stable, unattended, cross-platform, or generally capable of handling all Smart Summary UI variants. It currently follows the validated `E:/work/AgentsShare/wecom_uia_probe` flow plus a supervised recovery path for Smart Summary history-result pages, and still requires live retesting.
+- Do not describe the WeCom collector as stable, unattended, cross-platform, or generally capable of handling all Smart Summary UI variants. It is Windows-only, user-supervised, and must follow `references/wecom-smart-summary-collector.md`.
 - Never treat a previous Smart Summary history result as current evidence. If Smart Summary opens to a historical result, create a new summary session with the `+` button first; only the newly generated result may be saved as current-period evidence.
-- Mark WeCom Smart Summary results as `Status: needs_user_confirmation`. Remind the user before using in a report: "企微智能总结是聊天记录摘要，可能遗漏或误解上下文。我会把它作为待确认证据使用，不会直接把讨论、计划或风险提醒写成已完成工作。"
+- Mark WeCom Smart Summary results as `Status: needs_user_confirmation`. Remind the user before using in a report: “企微智能总结是聊天记录摘要，可能遗漏或误解上下文。我会把它作为待确认证据使用，不会直接把讨论、计划或风险提醒写成已完成工作。”
 - Use `scripts/collect_wecom_smart_summary.py` for the actual collection. Read `references/wecom-smart-summary-collector.md` for the collector's capabilities, dependencies, and safety boundaries.
 
 Multi-source evidence orchestration:
