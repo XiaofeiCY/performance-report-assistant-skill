@@ -14,3 +14,5 @@ numpy==2.4.6
 pillow==12.2.0
 pyperclip==1.11.0
 uiautomation==2.0.29
+opencv-python
+rapidocr-onnxruntime
