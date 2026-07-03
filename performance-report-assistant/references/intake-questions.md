@@ -56,7 +56,7 @@ For relative dates:
 
 仅在用户明确要求采集企微智能总结时使用。不要自动触发。
 
-- 需要采集什么内容？例如：本周工作事项、临时生产修数、跨部门协调、风险跟进等。
+- 需要采集什么内容？例如：本周做了哪些事、哪些人/哪些群找过我、每次对话中产出的工作内容、跨部门协调、风险跟进等。
 - 我会根据已确认的报告周期生成默认采集提示词，你可以直接确认、修改或提供自己的提示词。
 - 如果报告周期已经解析为具体日期，默认采集提示词必须让周期标签和用户原话保持一致。用户说"上周"时，只能写"上周（YYYY-MM-DD 至 YYYY-MM-DD）"或直接写"YYYY-MM-DD 至 YYYY-MM-DD 期间"。周期标签不明时用"目标周期内"，不要把当前周标签和上一周日期范围混在一起。
 - 企微智能总结可能打开在三种状态：企微主聊天页、智能总结新建输入页、或上一次历史结果页。历史结果页不是本次证据，脚本应点击 `+` 新建本次总结后再输入提示词。
@@ -186,6 +186,12 @@ Use these when the conversation is about to go wrong:
 ```text
 企微智能总结是聊天记录摘要，可能遗漏或误解上下文。我会把它作为待确认证据使用，不会直接把讨论、计划或风险提醒写成已完成工作。
 ```
+
+## Reusable Template Memory
+
+- A user-provided template, example, or accepted draft is current-task reference by default. Do not automatically turn it into a global/default template.
+- After successful delivery, when useful, ask once: "是否把这套结构记录为你后续的【周报/绩效/述职】模板？如果不需要，我只把它作为本次参考。"
+- Persist a reusable template only after explicit user approval. Record its owner/scope, report type, structure rules, and limits; never apply one user's template to all users or all report scenarios.
 
 ## Template Confirmation Prompt
 
