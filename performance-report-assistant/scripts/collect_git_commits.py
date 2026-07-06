@@ -70,12 +70,14 @@ def is_repo_url(repo_text: str) -> bool:
     return bool(REPO_URL_PATTERN.match(repo_text))
 
 
-def clone_repo(repo_url: str, branch: str | None, clone_parent: Path, all_branches: bool) -> Path:
+def clone_repo(repo_url: str, branch: str | None, clone_parent: Path, all_branches: bool, shallow_depth: int = 0) -> Path:
     clone_parent.mkdir(parents=True, exist_ok=True)
     clone_dir = clone_parent / "repo"
     cmd = ["git", "clone"]
     if branch and not all_branches:
-        cmd.extend(["--branch", branch])
+        cmd.extend(["--branch", branch, "--single-branch"])
+    if shallow_depth > 0:
+        cmd.extend(["--depth", str(shallow_depth)])
     cmd.extend([repo_url, str(clone_dir)])
     subprocess.run(cmd, check=True, capture_output=True, encoding="utf-8", errors="replace")
     return clone_dir
@@ -375,6 +377,14 @@ def main() -> int:
     )
     parser.add_argument("--author", help="Optional git author filter.")
     parser.add_argument("--no-stats", action="store_true", help="Only output commit list, without repository metrics.")
+    parser.add_argument(
+        "--shallow-depth", type=int, default=0, metavar="N",
+        help="Shallow clone depth for remote repos (default: 0 = full clone). "
+             "Set to e.g. 100 for faster clones when you are certain all relevant "
+             "commits are within the last N commits on every branch of interest. "
+             "Not recommended with --all-branches unless you verify all target "
+             "branches are fetched.",
+    )
     parser.add_argument("--output", help="Output Markdown file. Prints to stdout when omitted.")
     args = parser.parse_args()
 
@@ -388,7 +398,7 @@ def main() -> int:
         for index, repo_text in enumerate(args.repo, start=1):
             cloned_from_url = is_repo_url(repo_text)
             if cloned_from_url:
-                repo = clone_repo(repo_text, args.branch, temp_dir / f"repo-{index}", use_all_branches)
+                repo = clone_repo(repo_text, args.branch, temp_dir / f"repo-{index}", use_all_branches, args.shallow_depth)
             else:
                 repo = Path(repo_text).expanduser().resolve()
                 if not repo.exists():
