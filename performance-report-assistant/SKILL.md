@@ -42,7 +42,7 @@ After the user answers, continue one step at a time:
 2. Confirm audience.
 3. Confirm date range. If the user gives a relative period such as "上周", convert it to exact dates using `scripts/resolve_report_period.py`, then continue.
 4. Ask whether there is a fixed template file, a previous filled report/example, or no template.
-5. Confirm where the final file should be saved.
+5. **Confirm output location before any file-writing command.** This is a hard precondition — no file may be written to disk until the output directory has been explicitly confirmed by the user. Do not skip this step even on the fast path. See "4. Confirm Output Location" for the full rule.
 6. Ask for evidence sources only after the scenario, template situation, and output location are clear.
 7. If a repository is provided, use all branches by default unless the user explicitly names a branch.
 
@@ -101,6 +101,8 @@ Use the least-effort source available:
 Repository handling:
 
 - If the user provides one or more local git repository paths or git URLs, always collect quantitative evidence from those repositories for the target date range, regardless of report type.
+- **Output location safety**: a local git repository provided as evidence is NOT an output destination. Do not write `outputs/`, git statistics markdown, screenshots, OCR files, trace files, or any report artifacts into an evidence repository unless the user explicitly confirms that repository as the output location (e.g. "就保存在这个仓库下", "输出到这个目录").
+- **Safe git statistics mode**: when git statistics are needed but no output location has been confirmed, run `collect_git_commits.py` without `--output`. The script prints to stdout by default. Capture stdout in the agent response/context. Do not create markdown files. Only pass `--output` after the user has confirmed an output directory and you have shown the absolute planned path.
 - Before running `collect_git_commits.py`, make sure branch scope, author filter, repository list, and date range are known. If any key parameter is missing or ambiguous, present a pre-execution confirmation checklist and wait for explicit approval. The script's internal default (all branches when `--branch` is omitted) is a safety net for the script itself; the agent interview must not silently default to any branch scope.
 - If the user has already provided repository list, target period, branch scope, and author filter in the current interview, treat that as the required approval for read-only git statistics and proceed without asking for a fixed confirmation phrase. Use the **compact pre-execution summary** format from `references/intake-questions.md`: a single line confirming period, repos, branch, author, scope, followed by "开始执行统计？". Pause only when the user changes a parameter or when a key parameter is missing or ambiguous.
 - If the user provides a repository but does not explicitly name a branch, ask: "代码统计前我先确认扫描范围：这些仓库要看当前分支、指定分支，还是全部分支？"
@@ -147,8 +149,9 @@ Date range handling:
 Enterprise WeChat Smart Summary:
 
 - Only trigger when the user explicitly requests it, e.g. “采集企微智能总结”, “从企业微信智能总结提取”, “用企微智能总结作为材料”. Never auto-trigger.
+- **Output location safety**: any WeCom mode that writes files (probe screenshots/OCR, full-auto diagnostics, semi-manual/manual markdown/JSON) must use absolute paths under the confirmed output root. The scripts now reject relative `--output`, `--output-json`, and `--screenshot-dir` paths. Pass explicit absolute paths to these options.
 - The product goal is supervised full automatic Smart Summary collection. The user authorizes and supervises, but the script should perform entering Smart Summary, creating the current summary, pasting the prompt, starting generation, waiting, copying, and saving. `--manual-input`, `--prompt-only`, and `--semi-manual` are fallback/debug paths only, not the recommended main path.
-- **New in this version**: `--probe-only` read-only diagnostic mode (capture, OCR, classify — no clicks/pastes/copies). Run this before first full-auto attempt to verify window detection and page classification.
+- **New in this version**: `--probe-only` read-only diagnostic mode (capture, OCR, classify — no clicks/pastes/copies). Run this before first full-auto attempt to verify window detection and page classification. Must pass `--screenshot-dir` under the confirmed output root.
 - Current accepted probe boundary as of 2026-07-01: ordinary Enterprise WeChat chat/group pages must classify as `main_page`, not `summary_history_page`; non-WeCom foreground must fail safely; successful probe output uses `probe.png` plus same-source region screenshots.
 - After the user requests it, confirm the collection goal and report period. The default WeCom Smart Summary prompt body is fixed in `collect_wecom_smart_summary.py` as `DEFAULT_PROMPT_BODY`. To display the default prompt to the user during the confirmation step, run `python scripts/collect_wecom_smart_summary.py --prompt-only --period “<period>”` and show its output. Do not write or paraphrase a “default prompt” from memory — the output of `--prompt-only` is the only acceptable default prompt preview.
 - If the user wants a custom prompt, they must provide it explicitly (e.g. paste it, or point to a file via `--prompt-file`). The agent must not silently edit the canonical `DEFAULT_PROMPT_BODY` or present a rewritten version as the default. Custom prompts go through `--prompt-file`; the script's `load_prompt()` reads that file verbatim.
@@ -172,7 +175,9 @@ Enterprise WeChat Smart Summary:
 - 允许脚本最大化或调整企业微信窗口以归一化识别区域；
 - 允许 prompt 中加入本次采集指纹，用于校验复制结果属于本次生成；
 - 脚本不会发送、删除、编辑或转发任何消息；
-- 输出路径为：[path]。
+- 输出根目录为：[确认的输出目录]。
+
+诊断文件提醒：采集过程会在输出目录下生成截图、区域裁剪、OCR 文本、trace.jsonl 等诊断文件（约几十个文件）。这些仅用于失败诊断，不会出现在最终报告中。
 
 确认无误后我再执行。请明确回复”确认执行企微采集”。
 ```
@@ -203,13 +208,14 @@ Multi-source evidence orchestration:
 
 ```text
 当前材料采集状态：
-- 仓库 A：成功，输出 outputs/repo_a_commits.md
+- 仓库 A：成功，git 统计已收集（stdout 模式，尚未落盘）
 - 仓库 B：失败，原因：认证失败
 - Word 文档：成功，已读取
 - 旧周报：仅参考结构，不复用内容
 - 企微智能总结：失败，原因：未找到智能总结窗口
 
 是否基于已成功材料继续？你也可以选择重试失败来源或补充手动材料。
+请在继续前确认输出目录，我会在那之后将 git 统计保存为文件。
 ```
 
 - When a failed source could materially affect report quality, let the user choose: continue with available evidence, retry the failed source, switch to manual input, or pause.
@@ -218,16 +224,46 @@ Multi-source evidence orchestration:
 - If access is unavailable, ask the user for the smallest manual action: export the target month's weekly reports, paste them into one file, or provide screenshots/text. Do not require unnecessary reformatting.
 - Never imply messages can be fetched without user authorization.
 
-### 4. Confirm Output Location
+### 4. Confirm Output Location (Hard Precondition)
 
-Before generating files, ask where the output should be saved.
+**No file may be written to disk until the output location has been explicitly confirmed by the user.** This rule applies to all file-writing operations: final reports, git statistics markdown, WeCom diagnostics (screenshots, OCR, trace JSONL), JSON summaries, and template copies.
 
-Prefer this order:
+#### Evidence repository is not an output folder
 
-1. User-specified folder.
-2. Same folder as the template, using a clear filename.
-3. Current workspace `outputs/` folder if available.
-4. Current working directory as a fallback.
+If the user provides a local git repository path or starts the agent from a git repository, that repository is evidence input only. Do not write report artifacts into that repository unless the user explicitly says something equivalent to:
+
+```text
+就保存在这个仓库下
+可以在当前项目创建 outputs
+输出到 E:\work\asi-station-mini\outputs
+```
+
+#### Confirmation workflow
+
+1. Ask: "报告和过程文件保存在哪个目录？"
+2. If the user provides a path, use it after showing the absolute resolved path.
+3. If the user says "当前目录" or equivalent, confirm: "你确定要把输出文件保存在 [CWD] 吗？这个目录看起来是一个 [业务项目/ git 仓库 / 普通目录]。"
+4. If the user has not confirmed, do not write files. Collect evidence in stdout/memory only.
+5. Once confirmed, all generated files (reports, git evidence, WeCom diagnostics) go under that root.
+
+#### Generated files preview
+
+Before running a writing workflow, summarize what will be created:
+
+```text
+将在 [确认的输出目录] 下生成：
+- git 统计文件：weekly_git_stats_<period>.md
+- 最终报告：weekly_report_<period>.md
+- （如运行企微采集）诊断目录：wecom_runs/<run-id>/（含截图、OCR 文本、trace）
+```
+
+#### Safe defaults by operation
+
+- **Git statistics**: run without `--output` first (stdout only). Save to file only after output directory is confirmed.
+- **WeCom probe/full-auto**: require absolute `--screenshot-dir` under the confirmed output root. The script rejects missing or relative paths.
+- **WeCom semi-manual/manual**: require absolute `--output` and `--output-json` under the confirmed output root. The script rejects relative paths.
+- **Template fill**: require absolute `--output` under the confirmed output root.
+- **Prompt-only mode** (`--prompt-only`): safe to run without output confirmation — it only prints to stdout.
 
 Use clear filenames that include scenario and period, for example:
 
@@ -236,8 +272,6 @@ Use clear filenames that include scenario and period, for example:
 周报总结_2026年第22周.md
 领导汇报_2026年5月.md
 ```
-
-If the user does not choose a location, say the planned save path before creating the file and ask for confirmation when writing outside the current workspace.
 
 ### 5. Inspect and Confirm Template Changes
 
@@ -356,24 +390,30 @@ Always provide a short summary of:
 
 ### collect_git_commits.py
 
-Use this whenever the user provides local git repositories or git URLs as evidence. By default it outputs both a commit list and repository metrics.
+Use this whenever the user provides local git repositories or git URLs as evidence. By default it outputs both a commit list and repository metrics to stdout.
 
-Example:
+**Safe default (stdout only, no files created)** — use this when the output location has not been confirmed:
 
 ```bash
-python scripts/collect_git_commits.py --repo C:\path\repo --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
+python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01
 ```
 
-All-branches example:
+**With output file** — only after the user has confirmed an output directory:
 
 ```bash
-python scripts/collect_git_commits.py --repo C:\path\repo --all-branches --author "Your Name" --since 2026-05-01 --until 2026-05-31 --output commits.md
+python scripts/collect_git_commits.py --repo C:\path\repo --branch main --since 2026-05-01 --until 2026-06-01 --output E:\confirmed-output\commits.md
+```
+
+All-branches with confirmed output:
+
+```bash
+python scripts/collect_git_commits.py --repo C:\path\repo --all-branches --author "Your Name" --since 2026-05-01 --until 2026-05-31 --output E:\confirmed-output\commits.md
 ```
 
 Git URL example:
 
 ```bash
-python scripts/collect_git_commits.py --repo https://github.com/example/project.git --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
+python scripts/collect_git_commits.py --repo https://github.com/example/project.git --branch main --since 2026-05-01 --until 2026-06-01 --output E:\confirmed-output\commits.md
 ```
 
 **Performance**: Remote repos are full-cloned by default to guarantee all-branch evidence completeness. For repos where you are certain all relevant commits are within recent history, opt in to shallow clone:
@@ -447,7 +487,7 @@ or:
 Run:
 
 ```bash
-python scripts/fill_excel_template.py --template template.xlsx --mapping mapping.json --output filled.xlsx
+python scripts/fill_excel_template.py --template E:\templates\template.xlsx --mapping mapping.json --output E:\confirmed-output\filled.xlsx
 ```
 
 ## Reference Files

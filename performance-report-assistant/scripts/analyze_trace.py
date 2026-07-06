@@ -6,8 +6,8 @@ timing summary.  Does NOT modify the collector -- read-only analysis only.
 
 Usage:
   python scripts/analyze_trace.py <run_dir> [<run_dir2> ...]
-  python scripts/analyze_trace.py outputs/wecom_runs/20260706-102206-RRI8
-  python scripts/analyze_trace.py outputs/wecom_runs/*/
+  python scripts/analyze_trace.py E:\\confirmed-output\\wecom_runs\\20260706-102206-RRI8
+  python scripts/analyze_trace.py E:\\confirmed-output\\wecom_runs\\*/
 """
 
 import json
