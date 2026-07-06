@@ -2767,6 +2767,14 @@ def run_probe_only(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+def _stage(msg: str) -> None:
+    """Print a stage banner for supervised collection progress visibility."""
+    print()
+    print("-" * 40)
+    print(f"  {msg}")
+    print("-" * 40)
+
+
 def run_automation(args: argparse.Namespace) -> str:
     require_windows()
     check_automation_dependencies()
@@ -2801,7 +2809,8 @@ def run_automation(args: argparse.Namespace) -> str:
     # Countdown warning
     _print_countdown(3)
 
-    print(f"企微采集：受监督全自动模式启动。")
+    _stage("阶段 1/6：初始化")
+
     print(f"运行 ID：{run_id}")
     print(f"采集指纹：{fingerprint}")
     print(f"诊断目录：{run_dir}")
@@ -2851,6 +2860,8 @@ def run_automation(args: argparse.Namespace) -> str:
 
     atexit.register(_release_keep_awake)
 
+    _stage("阶段 2/6：窗口定位与归一化")
+
     # ---- Stage 1: Find and normalize window ----
     if not _global_ok("find_window"):
         _save_diagnostics_and_exit("全局超时", "find_window", str(run_dir))
@@ -2876,6 +2887,8 @@ def run_automation(args: argparse.Namespace) -> str:
 
     _, _, children = find_best_wecom_window()
     child_hwnd, child_rect = find_smart_summary_child(children)
+
+    _stage("阶段 3/6：页面状态恢复")
 
     # ---- Stage 2: State machine loop ----
     if not _global_ok("state_machine"):
@@ -3009,6 +3022,8 @@ def run_automation(args: argparse.Namespace) -> str:
         else:
             _save_diagnostics_and_exit(f"意外页面状态：{page_state}", "state_machine", str(run_dir))
 
+    _stage("阶段 4/6：粘贴提示词与开始总结")
+
     # ---- Stage 3: Verify and paste ----
     if not _global_ok("paste"):
         _save_diagnostics_and_exit("全局超时", "paste", str(run_dir))
@@ -3057,6 +3072,8 @@ def run_automation(args: argparse.Namespace) -> str:
                 str(run_dir),
             )
 
+    _stage("阶段 5/6：等待智能总结生成")
+
     # ---- Stage 4: Wait ----
     if not _global_ok("wait"):
         _save_diagnostics_and_exit("全局超时", "wait_generation", str(run_dir))
@@ -3087,6 +3104,8 @@ def run_automation(args: argparse.Namespace) -> str:
             "wait_generation",
             str(run_dir),
         )
+
+    _stage("阶段 6/6：复制结果与指纹校验")
 
     # ---- Stage 5: Copy ----
     if not _global_ok("copy"):
