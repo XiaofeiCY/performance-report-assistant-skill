@@ -1,10 +1,10 @@
 # Project Status
 
-## Current Handoff Snapshot (2026-07-03)
+## Current Handoff Snapshot (2026-07-06)
 
 This is the first section to read after switching Codex / Claude windows.
 
-Current project entry file:
+Project entry file:
 
 ```text
 AGENTS.md
@@ -17,118 +17,107 @@ CLAUDE.md
 AGENT.md
 ```
 
-## Current Outcome
+Current state:
 
-The current weekly-report round is complete.
+- No pending Claude task.
+- The weekly-report round for `2026-06-29 至 2026-07-03` is complete; the user accepted and used the draft.
+- The WeCom Smart Summary collector has a retained successful supervised run from `2026-07-06`.
+- The default WeCom prompt source fix, full-flow latency analysis helper, git evidence correctness return fix, and installed Claude skill sync have all been accepted.
+- Project reduction was completed after those acceptances; completed task handoff docs and stale diagnostics were removed.
 
-- Report type: 周报
-- Audience: 直属领导
-- Period: `2026-06-29 至 2026-07-03`
-- User accepted the drafted report and copied it for use.
-- The user-provided report structure was only used as this task's reference and was not saved as a global template.
+## Current Retained Outputs
 
-Current retained report and evidence:
+Keep these current-period report outputs:
 
 ```text
 outputs/weekly_report_2026-06-29_2026-07-03.md
 outputs/weekly_git_stats_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.json
-outputs/wecom_runs/20260703-160202-REJ2/
 ```
 
-## Latest Collector Maintenance
-
-Latest completed maintenance: optimize WeCom Smart Summary copy-stage latency while preserving safe automation.
-
-Accepted on 2026-07-03 by Codex static/offline review.
-
-Modified file:
+Latest retained successful WeCom diagnostic run:
 
 ```text
-performance-report-assistant/scripts/collect_wecom_smart_summary.py
-```
-
-What changed:
-
-- Reuses `fp_scroll_*` OCR text in Phase 2 instead of recomputing the same full-frame OCR.
-- Merges lower `main_body` OCR for both `main_body_ocr` and action-row geometry.
-- Keeps `main_body_ocr` before geometry / `lower_combined` / scroll fallbacks.
-- Keeps `lower_combined` for the already verified boundary case where the action row straddles `main_body` and `bottom_action_bar`.
-- Adds `copy_timing` trace logs for key copy-stage steps.
-- Keeps `wheel_without_click`, `foreground_lost` fail-fast, and exact clipboard fingerprint verification.
-
-Validated statically:
-
-```powershell
-python -m py_compile .\performance-report-assistant\scripts\collect_wecom_smart_summary.py
-python .\performance-report-assistant\scripts\collect_wecom_smart_summary.py --prompt-only --period "2026-06-29..2026-07-03"
-rg -n "main_body_ocr|lower_combined|copy_frame_source|use_frame|wheel_without_click|foreground_lost|fingerprint_match|manual|Ctrl\\+A|Ctrl\\+C|right-click|右键|content_cx|content_cy" performance-report-assistant\scripts\collect_wecom_smart_summary.py
-```
-
-No full-auto WeCom live automation was run during Codex acceptance. Any future full-auto live test must be supervised and explicitly authorized by the user in the current conversation.
-
-## Latest WeCom Live Evidence
-
-Latest successful supervised live run:
-
-```text
-outputs/wecom_runs/20260703-160202-REJ2/
+outputs/wecom_runs/20260706-102206-RRI8/
 ```
 
 Key trace facts:
 
+- Fingerprint: `PRAS-20260706-102206-5678`
+- `paste_verify visible_fingerprint=true`
 - `copy_result phase=fp_scroll context_confirmed=true use_frame=fp_scroll_1`
-- `copy_result phase=copy_search source_frame=fp_scroll_1`
-- `copy_result phase=action_row_geometry region=lower_combined ... selected="复制" screen_coords=[564,1050]`
-- `copy_result method=ocr_direct result_len=2087 fingerprint_match=true`
+- `copy_result phase=action_row_geometry region=lower_combined selected="复制" screen_coords=[564,1050]`
+- `copy_result method=ocr_direct result_len=1883 fingerprint_match=true`
 - `automation_complete fingerprint_match=true`
 
-Earlier same-day failure and repair runs have been summarized here and removed during cleanup.
+## Accepted Changes Since Last Report
 
-## Git Evidence
+WeCom default prompt source:
 
-User-provided repos:
+- `performance-report-assistant/SKILL.md` now requires agents to show the default WeCom prompt from `collect_wecom_smart_summary.py --prompt-only`.
+- Agents must not invent or paraphrase a separate default prompt.
+- Custom prompts must be explicit, for example via `--prompt-file`.
+
+Full-flow latency optimization, low-risk phase:
+
+- Added `performance-report-assistant/scripts/analyze_trace.py`, a read-only trace timing analyzer.
+- Reduced unnecessary interview repetition through fast-path guidance in `SKILL.md` and `references/intake-questions.md`.
+- Did not change WeCom collector core state machine, OCR decisions, copy strategy, wait-result logic, fingerprint verification, or foreground/page-state safety checks.
+
+Git evidence correctness:
+
+- `collect_git_commits.py` restores correctness-first behavior: remote URL clones are full clone by default (`--shallow-depth 0`).
+- `--shallow-depth N` remains available only as explicit opt-in and is documented as unsafe for evidence-complete all-branches personal reports.
+- Offline validation confirmed default full clone sees commits on both default and non-default remote branches.
+
+Installed Claude skill sync:
+
+- Completed on 2026-07-06.
+- Source: `E:\work\performance-report-assistant-skill\performance-report-assistant`
+- Destination: `C:\Users\Lenovo\.claude\skills\performance-report-assistant`
+- Backup: `C:\Users\Lenovo\.claude\skills\performance-report-assistant.backup-20260706-110007`
+- Excluded from mirror sync: `outputs`, `agents`, `__pycache__`, `.git`, `*.pyc`, `pc_commits.md`, `mini_commits.md`.
+- Verified key file hashes and installed-copy `py_compile`.
+
+## Report Evidence Snapshot
+
+Report type: 周报
+
+Audience: 直属领导
+
+Period:
 
 ```text
+2026-06-29 至 2026-07-03
+```
+
+Git evidence used for the accepted report:
+
+```text
+Repos:
 http://47.105.186.81:9006/asi2.x/asi-station-mini.git
 http://47.105.186.81:9006/asi2.x/asi-station-webapp.git
-```
 
 Scope:
-
 - Branches: all branches
-- Author: `chayne`
-- Period: `2026-06-29 至 2026-07-03`
+- Author: chayne
+- Period: 2026-06-29 至 2026-07-03
 
-Remote access timed out. Local fallback repos were used only because their `origin` remotes match the user-provided URLs:
+Fallback:
+- Remote access timed out during the accepted report round.
+- Local fallback repos were used only because their origin remotes matched the user-provided URLs:
+  E:\work\asi-station-mini
+  E:\work\asi-station-webapp
 
-```text
-E:\work\asi-station-mini
-E:\work\asi-station-webapp
+Accepted report result:
+- asi-station-mini: 4 commits, 2 changed files, +33/-3
+- asi-station-webapp: 0 commits for chayne in the target period
 ```
 
-Result:
+Note:
 
-- `asi-station-mini`: 4 commits, 2 changed files, `+33/-3`
-- `asi-station-webapp`: 0 commits for `chayne` in the target period
-
-## Cleanup Completed
-
-Project reduction completed on 2026-07-03.
-
-Deleted:
-
-- Completed task handoff docs from `docs/tasks/`.
-- Old WeCom run directories except the latest successful current-period run `outputs/wecom_runs/20260703-160202-REJ2/`.
-- Early root build plan `claude-code-skill-build-plan.md`.
-
-Kept:
-
-- Short recovery entry docs: `AGENTS.md`, `docs/status.md`.
-- Current weekly report and evidence outputs.
-- Latest successful WeCom run diagnostics.
-- Core skill, scripts, references, README files, and template assets.
+- Later full-clone validation found additional all-branch remote commits in a test run. Those were used to validate git evidence correctness, not to rewrite the already accepted report.
 
 ## Standing Rules
 
@@ -144,14 +133,32 @@ Template memory:
 
 Git evidence:
 
-- If repo list, target period, branch scope, and author filter are already explicit in the current interview, run read-only git statistics without demanding a fixed confirmation phrase.
+- If repo list, target period, branch scope, and author filter are already explicit in the current interview, use the compact pre-execution summary and avoid repeated questioning.
 - If remote repo access times out, local fallback is allowed only when local `origin` matches the user-provided URL, and the fallback must be disclosed.
+- Full clone is the default for remote URL evidence collection. Shallow clone is explicit opt-in only.
 
 WeCom automation:
 
 - Do not run full-auto WeCom live automation unless the user again supervises and explicitly authorizes it.
 - Do not describe the collector as unattended, cross-environment stable, or generally compatible with all WeCom UI variants.
 - Forbidden: sending/deleting/editing/forwarding messages, continuing when WeCom is not foreground, right-click copy, unknown-area `Ctrl+A/Ctrl+C`, multi-fixed-coordinate probing, left-menu vertical scanning, or clicking body text/URLs to obtain scroll focus.
+
+## Cleanup Completed
+
+Project reduction completed on 2026-07-06.
+
+Deleted:
+
+- Completed task handoff docs from `docs/tasks/`.
+- Old WeCom run directory `outputs/wecom_runs/20260703-160202-REJ2/`.
+- Temporary git statistics outputs `outputs/commits_mini.md` and `outputs/commits_webapp.md`.
+- Python cache directory `performance-report-assistant/scripts/__pycache__/`.
+
+Kept:
+
+- Short recovery entry docs: `AGENTS.md`, `docs/status.md`.
+- Current report outputs and latest successful WeCom diagnostic run.
+- Core skill, scripts, references, README files, template assets, and agent metadata.
 
 ## If Work Continues
 

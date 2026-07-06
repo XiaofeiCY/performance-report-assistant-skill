@@ -9,13 +9,13 @@ This collector is a user-supervised desktop automation path. Do not describe it 
 Latest retained successful current-period run:
 
 ```text
-outputs/wecom_runs/20260703-160202-REJ2/
+outputs/wecom_runs/20260706-102206-RRI8/
 ```
 
 Fingerprint:
 
 ```text
-PRAS-20260703-160202-4532
+PRAS-20260706-102206-5678
 ```
 
 Outputs:
@@ -33,7 +33,7 @@ fingerprint_match=true
 copy method=lower_combined ocr_direct
 ```
 
-The current collector path has completed supervised end-to-end live runs. The latest retained run copied through the current-frame `lower_combined` action-row path after `fp_scroll_1` confirmed the current result and action row. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
+The current collector path has completed supervised end-to-end live runs. The latest retained run copied through the `lower_combined` action-row path after `fp_scroll_1` confirmed the current result and action row. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
 
 ## Supported Modes
 

@@ -17,7 +17,7 @@ performance-report-assistant/
 进入本项目后按顺序读取：
 
 1. `AGENTS.md`
-2. `docs/status.md` 顶部 `Current Handoff Snapshot (2026-07-03)`
+2. `docs/status.md` 顶部 `Current Handoff Snapshot (2026-07-06)`
 3. 如需企微采集器边界，再读 `performance-report-assistant/references/wecom-smart-summary-collector.md`
 4. 如需报告采访规则，再读 `performance-report-assistant/SKILL.md`
 
@@ -50,8 +50,9 @@ AGENT.md
 本轮已完成：
 
 - 周报生成闭环，用户已采用草稿。
-- 企微智能总结采集器复制阶段维护与耗时优化，Codex 已完成静态/离线验收。
-- 项目减重，旧任务文档和旧企微 run 已删除。
+- 企微智能总结默认提示词来源修复，已验收并同步到 Claude 内部 skill。
+- 完整流程低风险耗时优化，已验收：新增只读 `analyze_trace.py`，优化采访 fast path，恢复 git 统计 full clone 默认以保证证据完整。
+- 项目减重，旧任务文档、旧企微 run、临时 git 统计和 Python 缓存已删除。
 
 当前保留的关键输出：
 
@@ -60,13 +61,13 @@ outputs/weekly_report_2026-06-29_2026-07-03.md
 outputs/weekly_git_stats_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.json
-outputs/wecom_runs/20260703-160202-REJ2/
+outputs/wecom_runs/20260706-102206-RRI8/
 ```
 
 最新企微成功 run：
 
 ```text
-outputs/wecom_runs/20260703-160202-REJ2/
+outputs/wecom_runs/20260706-102206-RRI8/
 ```
 
 重要边界：
