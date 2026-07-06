@@ -20,10 +20,22 @@ AGENT.md
 Current state:
 
 - No pending Claude task.
+- Console-stage prompts for supervised WeCom collection have passed acceptance. Task doc: `docs/tasks/2026-07-06-wecom-console-stage-prompts.md`.
+- Temporary Windows keep-awake guard for supervised WeCom collection has passed second acceptance. Task doc: `docs/tasks/2026-07-06-wecom-keep-screen-awake.md`.
 - The weekly-report round for `2026-06-29 至 2026-07-03` is complete; the user accepted and used the draft.
 - The WeCom Smart Summary collector has a retained successful supervised run from `2026-07-06`.
 - The default WeCom prompt source fix, full-flow latency analysis helper, git evidence correctness return fix, and installed Claude skill sync have all been accepted.
 - Project reduction was completed after those acceptances; completed task handoff docs and stale diagnostics were removed.
+
+Current WeCom maintenance request:
+
+- User observed that longer supervised collection can trigger Windows display-off/sleep behavior.
+- Desired behavior: keep screen/system awake only during supervised collection, then release the request so previous power behavior resumes.
+- Recommended implementation: Windows `SetThreadExecutionState` context manager around the supervised desktop automation path; no `powercfg`, no mouse/keyboard simulation, no unattended positioning.
+- Acceptance round 1 result: rework required because keep-awake events were not written to the run trace, and `SetThreadExecutionState` return value `0` was not handled as failure.
+- Acceptance round 2 result: accepted. Non-live validation confirmed trace logging for enabled/disabled, correct return-0 failure handling, successful `py_compile`, and prompt-only still non-live. No live full-auto WeCom test was run.
+- New UX request: do not add breathing-light overlay because it may enter WeCom screenshots and affect OCR/template matching. Instead, add safer console-stage prompts for supervised collection progress.
+- Console-stage prompt acceptance result: accepted. Non-live validation confirmed stage banners are limited to supervised automation and prompt-only remains unchanged; no live full-auto WeCom test was run.
 
 ## Current Retained Outputs
 
