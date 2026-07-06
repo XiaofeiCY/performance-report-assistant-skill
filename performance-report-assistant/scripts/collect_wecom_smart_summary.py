@@ -22,6 +22,7 @@ import os
 import random
 import shutil
 import sys
+import atexit
 import time
 from ctypes import wintypes
 from datetime import datetime, timezone
@@ -177,6 +178,11 @@ HWND_NOTOPMOST = -2
 SWP_NOMOVE = 0x0002
 SWP_NOSIZE = 0x0001
 SWP_SHOWWINDOW = 0x0040
+
+# SetThreadExecutionState flags for keep-awake guard
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
+ES_DISPLAY_REQUIRED = 0x00000002
 
 
 def _window_class(hwnd: int) -> str:
@@ -2811,6 +2817,39 @@ def run_automation(args: argparse.Namespace) -> str:
     print("企微：初始化 OCR（首次加载可能需要几十秒）...")
     reader = easyocr.Reader(["ch_sim", "en"])
     trace.log(event="init_complete")
+
+    # ---- Keep-awake guard ----
+    _kw_enabled = False
+    if sys.platform == "win32" and kernel32 is not None:
+        try:
+            _kw_prev = kernel32.SetThreadExecutionState(
+                ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+            )
+            if _kw_prev == 0:
+                trace.log(event="keep_awake", state="enable_failed",
+                          reason="SetThreadExecutionState returned 0")
+                print("企微：请求保持唤醒失败（SetThreadExecutionState 返回 0），继续采集但不保证防息屏。")
+            else:
+                _kw_enabled = True
+                trace.log(event="keep_awake", state="enabled",
+                          flags="ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED",
+                          previous_state=f"0x{_kw_prev:x}")
+                print("企微：已请求 Windows 保持系统/显示器唤醒（SetThreadExecutionState）。")
+        except Exception as _kw_exc:
+            trace.log(event="keep_awake", state="enable_failed", error=str(_kw_exc))
+            print(f"企微：请求保持唤醒失败（{_kw_exc}），继续采集但不保证防息屏。")
+
+    def _release_keep_awake():
+        if _kw_enabled:
+            try:
+                kernel32.SetThreadExecutionState(ES_CONTINUOUS)
+                trace.log(event="keep_awake", state="disabled", flags="ES_CONTINUOUS")
+                print("企微：已释放保持唤醒请求，恢复原有电源行为。")
+            except Exception as _kw_exc:
+                trace.log(event="keep_awake", state="disable_failed", error=str(_kw_exc))
+                print(f"企微：释放保持唤醒请求失败（{_kw_exc}），电源行为可能未恢复。")
+
+    atexit.register(_release_keep_awake)
 
     # ---- Stage 1: Find and normalize window ----
     if not _global_ok("find_window"):
