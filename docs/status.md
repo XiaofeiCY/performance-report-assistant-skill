@@ -25,6 +25,25 @@ Current state:
 - Python cache under `performance-report-assistant/scripts/__pycache__/` was removed.
 - Current retained report outputs and the latest successful WeCom run were kept.
 
+Accepted task document:
+
+```text
+docs/tasks/2026-07-06-output-location-safety.md
+```
+
+Trigger:
+
+- User tested the installed skill from a random business repository and observed that the agent created `outputs/` plus git/WeCom artifacts under that repository without first asking for an output location.
+- This is considered a safety issue because evidence repositories must not be treated as implicit output destinations.
+
+Acceptance state:
+
+- Output-location safety accepted after final Codex review.
+- Relative file-writing outputs are rejected by script-side guardrails for git evidence, WeCom markdown/JSON outputs, WeCom diagnostic directories, and Excel template filling.
+- `collect_git_commits.py` without `--output` remains stdout-only and file-free.
+- `collect_wecom_smart_summary.py --prompt-only` remains file-free and prints absolute placeholder save commands.
+- Installed Claude skill copies were synchronized and verified by SHA256.
+
 ## Recent Accepted Work
 
 WeCom Smart Summary collector:
