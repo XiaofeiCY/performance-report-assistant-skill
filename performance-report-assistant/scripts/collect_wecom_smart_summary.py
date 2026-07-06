@@ -7,7 +7,7 @@ Supervised full-auto visual state machine with:
 - OpenCV template matching
 - Interception driver input
 - Current-run fingerprint verification
-- Trace diagnostics (outputs/wecom_runs/<run-id>/)
+- Trace diagnostics (--screenshot-dir/<run-id>/)
 
 Fallback: --semi-manual, --prompt-only, --manual-input.
 """
@@ -2607,19 +2607,40 @@ def _print_countdown(seconds: int = 3) -> None:
     print()
 
 
+def _require_explicit_output_dir(screenshot_dir: str, mode: str) -> None:
+    """Refuse to run a mode that writes diagnostic files without an explicit absolute --screenshot-dir.
+
+    The default relative path is unsafe because the current working directory
+    may be an unrelated business repository.  Requiring an explicit absolute
+    directory ensures the user has consciously chosen where diagnostics land.
+    """
+    if screenshot_dir and Path(screenshot_dir).is_absolute():
+        return
+    if not screenshot_dir:
+        print(f"错误：{mode} 模式会生成截图、OCR 文本、trace 等诊断文件，必须通过 --screenshot-dir 指定绝对输出目录。")
+    else:
+        print(f"错误：--screenshot-dir 必须使用绝对路径，收到相对路径：{screenshot_dir}")
+    print("示例：")
+    print(f"  python collect_wecom_smart_summary.py --screenshot-dir E:\\my-outputs\\wecom_diag --period ...")
+    print()
+    print("这样诊断文件不会意外写入当前工作目录（当前工作目录可能是无关的业务仓库）。")
+    sys.exit(1)
+
+
 def run_probe_only(args: argparse.Namespace) -> int:
     """Read-only diagnostic mode: find window, capture, OCR, classify — no clicks/pastes/copies.
 
     All screenshots (full + regions) come from a single trusted ImageGrab.grab() call.
     Foreground is verified before AND after the capture.
     """
+    _require_explicit_output_dir(args.screenshot_dir, "probe-only")
     require_windows()
     check_automation_dependencies()
 
     import easyocr
 
     run_id = generate_run_id()
-    run_dir = Path(args.screenshot_dir or f"outputs/wecom_runs/{run_id}")
+    run_dir = Path(args.screenshot_dir)
 
     # Clean old artifacts when using explicit --screenshot-dir
     if args.screenshot_dir and run_dir.exists():
@@ -2794,6 +2815,7 @@ def _stage(msg: str) -> None:
 
 
 def run_automation(args: argparse.Namespace) -> str:
+    _require_explicit_output_dir(args.screenshot_dir, "full-auto")
     require_windows()
     check_automation_dependencies()
 
@@ -2802,7 +2824,7 @@ def run_automation(args: argparse.Namespace) -> str:
 
     run_id = generate_run_id()
     fingerprint = generate_fingerprint()
-    run_dir = Path(args.screenshot_dir or f"outputs/wecom_runs/{run_id}")
+    run_dir = Path(args.screenshot_dir)
 
     if args.screenshot_dir and run_dir.exists():
         _clean_old_artifacts(run_dir)
@@ -3229,8 +3251,8 @@ def run_prompt_only(args: argparse.Namespace) -> int:
     print()
     scenario = args.scenario
     period = args.period
-    output = args.output or "outputs/wecom_summary_manual.md"
-    output_json = args.output_json or "outputs/wecom_summary_manual.json"
+    output = args.output or "E:\\confirmed-output\\wecom_summary_manual.md"
+    output_json = args.output_json or "E:\\confirmed-output\\wecom_summary_manual.json"
     print(
         f'  "粘贴智能总结结果" | python '
         f'collect_wecom_smart_summary.py --manual-input '
@@ -3279,7 +3301,7 @@ def run_semi_manual(args: argparse.Namespace) -> int:
             print("错误：当前终端不支持交互输入且未提供管道数据。")
             print("请在 cmd.exe 或 PowerShell 中运行此命令，或使用管道传入结果。")
             print("示例：")
-            print('  "粘贴结果" | python collect_wecom_smart_summary.py --semi-manual --output outputs/wecom.md')
+            print('  "粘贴结果" | python collect_wecom_smart_summary.py --semi-manual --output E:\\confirmed-output\\wecom.md')
             return 1
         raw_summary = raw_bytes.decode("utf-8", errors="replace").strip()
     else:
@@ -3399,8 +3421,8 @@ def main() -> int:
     parser.add_argument("--scenario", default="weekly-summary", help="Report scenario tag.")
     parser.add_argument("--period", default="", help="Report period, e.g. '2026-06-22..2026-06-26'.")
     parser.add_argument("--prompt-file", help="Read smart summary prompt from file instead of default.")
-    parser.add_argument("--output", help="Output Markdown file path.")
-    parser.add_argument("--output-json", help="Output JSON file path.")
+    parser.add_argument("--output", help="Output Markdown file path (must be absolute).")
+    parser.add_argument("--output-json", help="Output JSON file path (must be absolute).")
     parser.add_argument("--manual-input", action="store_true", help="Manual mode: read from stdin or clipboard.")
     parser.add_argument("--semi-manual", action="store_true",
                         help="Semi-auto mode: print prompt, wait for user to paste result, save output.")
@@ -3410,7 +3432,7 @@ def main() -> int:
                         help="Read-only diagnostic mode: capture, OCR, classify; no clicks, pastes, or copies.")
     parser.add_argument("--from-clipboard", action="store_true", help="With --manual-input: read text from clipboard.")
     parser.add_argument("--screenshot-dir", default="",
-                        help="Override run directory (default: outputs/wecom_runs/<run-id>).")
+                        help="Absolute path for diagnostic run directory (required for probe/full-auto modes).")
     parser.add_argument("--max-wait-seconds", type=int, default=180,
                         help="Hard upper limit for summary generation wait (default 180).")
     parser.add_argument("--stable-seconds", type=int, default=15,
@@ -3422,6 +3444,15 @@ def main() -> int:
     parser.add_argument("--global-budget-seconds", type=int, default=GLOBAL_BUDGET_SECONDS_DEFAULT,
                         help="Global time budget for the entire automation run (default 300).")
     args = parser.parse_args()
+
+    # Require absolute paths for all file-writing outputs.
+    # The current working directory may be an unrelated business repository.
+    for arg_name, arg_val in [("--output", args.output), ("--output-json", args.output_json)]:
+        if arg_val and not Path(arg_val).is_absolute():
+            print(f"错误：{arg_name} 必须使用绝对路径，收到相对路径：{arg_val}")
+            print("示例：")
+            print(f"  python collect_wecom_smart_summary.py ... {arg_name} E:\\confirmed-output\\output_file")
+            sys.exit(1)
 
     if args.prompt_only:
         return run_prompt_only(args)

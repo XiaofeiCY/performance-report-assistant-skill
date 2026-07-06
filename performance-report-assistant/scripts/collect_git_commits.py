@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import re
+import sys
 import tempfile
 import subprocess
 from pathlib import Path
@@ -385,8 +386,15 @@ def main() -> int:
              "Not recommended with --all-branches unless you verify all target "
              "branches are fetched.",
     )
-    parser.add_argument("--output", help="Output Markdown file. Prints to stdout when omitted.")
+    parser.add_argument("--output", help="Output Markdown file (must be an absolute path). Prints to stdout when omitted.")
     args = parser.parse_args()
+
+    if args.output and not Path(args.output).is_absolute():
+        print(f"错误：--output 必须使用绝对路径，收到相对路径：{args.output}")
+        print("示例：")
+        print(f"  python collect_git_commits.py --repo ... --output E:\\confirmed-output\\git_stats.md")
+        print("不带 --output 时输出到 stdout，不创建文件。")
+        sys.exit(1)
 
     args.since, args.until = normalize_date_range(args.since, args.until)
 

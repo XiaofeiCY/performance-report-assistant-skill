@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -125,8 +126,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Fill values into a copied Excel template.")
     parser.add_argument("--template", required=True, help="Original template path (.xlsx/.xlsm/.xltx/.xltm).")
     parser.add_argument("--mapping", required=True, help="JSON mapping file.")
-    parser.add_argument("--output", required=True, help="Output path.")
+    parser.add_argument("--output", required=True, help="Output path (must be absolute).")
     args = parser.parse_args()
+
+    if not Path(args.output).is_absolute():
+        print(f"错误：--output 必须使用绝对路径，收到相对路径：{args.output}")
+        print("示例：")
+        print(f"  python fill_excel_template.py --template ... --mapping ... --output E:\\confirmed-output\\report.xlsx")
+        sys.exit(1)
 
     from openpyxl.styles import Alignment
 
