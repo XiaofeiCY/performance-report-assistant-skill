@@ -35,6 +35,12 @@ copy method=lower_combined ocr_direct
 
 The current collector path has completed supervised end-to-end live runs. The latest retained run copied through the `lower_combined` action-row path after `fp_scroll_1` confirmed the current result and action row. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
 
+Accepted maintenance on 2026-07-06:
+
+- Windows keep-awake guard: supervised desktop automation temporarily requests system/display awake with `SetThreadExecutionState`, logs keep-awake events to the current run trace, and releases the request on process exit.
+- Console stage prompts: supervised automation prints terminal-only stage banners. No overlay, GUI, toast, or visual element may cover WeCom because visible UI can enter screenshots and affect OCR/template matching.
+- History/result page classification: old Smart Summary result pages with header fingerprint/prompt evidence can classify as `summary_history_page` so the existing trusted `+` new-summary path can proceed. Old fingerprints are history evidence only; final clipboard verification still requires the exact current fingerprint.
+
 ## Supported Modes
 
 Primary path:
