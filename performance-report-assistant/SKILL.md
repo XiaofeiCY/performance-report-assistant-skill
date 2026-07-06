@@ -48,6 +48,8 @@ After the user answers, continue one step at a time:
 
 Avoid asking more than 2-3 questions in one turn unless the user explicitly wants a checklist.
 
+**Bundled answers (fast path)**: When the user provides answers to multiple interview steps in one message (e.g., "周报 直属 上周"), accept all of them and jump ahead to the next unanswered question. Do not re-ask questions the user has already answered. For returning users whose first message covers report type, audience, and period, skip the step-by-step preamble and go directly to evidence questions.
+
 ### 2. Classify the Report
 
 Identify the scenario:
@@ -100,7 +102,7 @@ Repository handling:
 
 - If the user provides one or more local git repository paths or git URLs, always collect quantitative evidence from those repositories for the target date range, regardless of report type.
 - Before running `collect_git_commits.py`, make sure branch scope, author filter, repository list, and date range are known. If any key parameter is missing or ambiguous, present a pre-execution confirmation checklist and wait for explicit approval. The script's internal default (all branches when `--branch` is omitted) is a safety net for the script itself; the agent interview must not silently default to any branch scope.
-- If the user has already provided repository list, target period, branch scope, and author filter in the current interview, treat that as the required approval for read-only git statistics and proceed without asking for a fixed confirmation phrase. Pause only when a key parameter is missing or ambiguous.
+- If the user has already provided repository list, target period, branch scope, and author filter in the current interview, treat that as the required approval for read-only git statistics and proceed without asking for a fixed confirmation phrase. Use the **compact pre-execution summary** format from `references/intake-questions.md`: a single line confirming period, repos, branch, author, scope, followed by "开始执行统计？". Pause only when the user changes a parameter or when a key parameter is missing or ambiguous.
 - If the user provides a repository but does not explicitly name a branch, ask: "代码统计前我先确认扫描范围：这些仓库要看当前分支、指定分支，还是全部分支？"
 - If the user explicitly names a branch, pass it to `scripts/collect_git_commits.py --branch <branch>` and restrict statistics to that branch.
 - If the user explicitly asks to use all branches, pass `--all-branches`; this is equivalent to omitting `--branch`.
@@ -148,8 +150,10 @@ Enterprise WeChat Smart Summary:
 - The product goal is supervised full automatic Smart Summary collection. The user authorizes and supervises, but the script should perform entering Smart Summary, creating the current summary, pasting the prompt, starting generation, waiting, copying, and saving. `--manual-input`, `--prompt-only`, and `--semi-manual` are fallback/debug paths only, not the recommended main path.
 - **New in this version**: `--probe-only` read-only diagnostic mode (capture, OCR, classify — no clicks/pastes/copies). Run this before first full-auto attempt to verify window detection and page classification.
 - Current accepted probe boundary as of 2026-07-01: ordinary Enterprise WeChat chat/group pages must classify as `main_page`, not `summary_history_page`; non-WeCom foreground must fail safely; successful probe output uses `probe.png` plus same-source region screenshots.
-- After the user requests it, confirm the collection goal. If the report period is known, generate a dynamic default prompt using the current date range context (never hardcoded dates). Show the prompt to the user and let them confirm, edit, or provide their own.
-- The default WeCom prompt must keep the period label semantically consistent with the user's request. If the user said “上周”, use either the same relative label plus dates, e.g. “总结上周（2026-06-22 至 2026-06-26）期间...”, or only absolute dates, e.g. “总结 2026-06-22 至 2026-06-26 期间...”. If the period label is unknown, use neutral wording such as “目标周期内”. Never combine a current-week label with a previous-week date range.
+- After the user requests it, confirm the collection goal and report period. The default WeCom Smart Summary prompt body is fixed in `collect_wecom_smart_summary.py` as `DEFAULT_PROMPT_BODY`. To display the default prompt to the user during the confirmation step, run `python scripts/collect_wecom_smart_summary.py --prompt-only --period “<period>”` and show its output. Do not write or paraphrase a “default prompt” from memory — the output of `--prompt-only` is the only acceptable default prompt preview.
+- If the user wants a custom prompt, they must provide it explicitly (e.g. paste it, or point to a file via `--prompt-file`). The agent must not silently edit the canonical `DEFAULT_PROMPT_BODY` or present a rewritten version as the default. Custom prompts go through `--prompt-file`; the script's `load_prompt()` reads that file verbatim.
+- The prompt displayed to the user for confirmation and the prompt pasted by automation come from the same `load_prompt()` code path. The only allowed difference is the per-run fingerprint value, which `--prompt-only` generates fresh on each invocation.
+- The default WeCom prompt must keep the period label semantically consistent with the user's request. If the user said “上周”, `--prompt-only --period “2026-06-29..2026-07-03”` produces “总结 2026-06-29 至 2026-07-03 期间...”. If the period label is unknown, use neutral wording such as “目标周期内”. Never combine a current-week label with a previous-week date range.
 - The collector now implements a visual state machine: window normalization, region-based screenshots, regional OCR, OpenCV template matching, Interception input, per-run trace output, and a unique collection fingerprint embedded in the prompt and verified after copy.
 - OpenCV template matching requires template assets at `performance-report-assistant/assets/wecom/`. If templates are missing, the script falls back to OCR. Templates should be extracted from `--probe-only` region screenshots.
 - Treat Enterprise WeChat Smart Summary as a state machine, not a single page. Implemented states: main page, unknown Smart Summary page, history result page, input page, generating page, result page. **History result page detection runs before input page detection.**
@@ -371,6 +375,14 @@ Git URL example:
 ```bash
 python scripts/collect_git_commits.py --repo https://github.com/example/project.git --branch main --since 2026-05-01 --until 2026-06-01 --output commits.md
 ```
+
+**Performance**: Remote repos are full-cloned by default to guarantee all-branch evidence completeness. For repos where you are certain all relevant commits are within recent history, opt in to shallow clone:
+
+```bash
+python scripts/collect_git_commits.py --repo <url> --shallow-depth 100 --since ... --until ...
+```
+
+Warning: `--shallow-depth` may miss older commits and non-default-branch commits. Do not use it for personal weekly/performance reports where evidence completeness matters, especially with `--all-branches`. For large repos, prefer pointing the script at a local clone path instead of a URL to skip the clone step entirely.
 
 When `--branch` is omitted, commit statistics search all branches by default to avoid missing work spread across feature, release, and hotfix branches. If both `--all-branches` and `--branch` are provided, commit statistics use all branches while current code size is measured from the selected/default branch.
 

@@ -22,6 +22,16 @@ Then ask the next question based on the answer. For new users, prefer this seque
 
 Do not ask for template, weekly reports, git repos, and style preferences all in the first message.
 
+### Bundled Answers (Fast Path)
+
+When the user provides answers to multiple interview questions in one message, accept all of them and jump ahead. Do not re-ask questions the user has already answered.
+
+Example: "周报 直属 上周" covers report type + audience + date range. Resolve the period, confirm the resolution, then move directly to template and evidence questions.
+
+For returning users who have run the skill before, the interview can be more compact:
+- If the user's first message already covers report type, audience, and period, skip the step-by-step preamble and go straight to evidence.
+- If the user provides repos with branch and author in the same message as the period, accept all parameters at once and proceed to the compact pre-execution summary (see Evidence Questions below).
+
 For relative dates:
 
 - Resolve "上周" as the previous Monday through Friday using the current date and timezone.
@@ -46,6 +56,15 @@ For relative dates:
 - **分支范围确认**：用户提供仓库后，在运行任何统计脚本之前，必须让用户选择当前分支、指定分支还是全部分支。脚本本身保留”未传 branch 时默认全部分支”的兜底行为，但 agent 采访不能静默默认全部分支。
 - 如果用户明确指定分支：只统计该分支。
 - **作者确认**：对个人周报、个人绩效或”我的提交”场景，即使 agent 知道用户是谁，也必须确认 git author 名称或邮箱。提示：”如果只统计你的提交，请确认 git author 名称或邮箱。可以给一个或多个；如果你要统计全部作者，我会在报告里把它标为仓库整体证据，不写成全部都是你的个人提交。”
+- **紧凑预执行汇总**：当用户已在同一轮采访中明确提供了仓库列表、分支范围、作者过滤和日期范围，使用紧凑格式代替完整确认清单：
+
+```text
+确认参数：周期 [YYYY-MM-DD 到 YYYY-MM-DD]、仓库 [repo 列表]、[全部分支 / 分支 xxx]、作者 [name]、仅个人提交。
+
+开始执行统计？
+```
+
+仅当用户回复”确认”或”可以”后执行。如果用户修改了任一参数，重新显示紧凑汇总。只有当某个关键参数缺失或模糊时，才回退到完整确认清单（参见 Guardrail Prompts）。
 - 如果用户不提供 author：统计全部作者并标注为仓库整体证据，不得写成个人提交。
 - 如果提供的是 GitHub/GitLab 等仓库 URL：我会用统计脚本克隆到临时目录，统计完成后自动删除临时 clone，不会长期保存在本地。
 - 哪些工作是你主导，哪些是参与或协同？
@@ -56,9 +75,12 @@ For relative dates:
 
 仅在用户明确要求采集企微智能总结时使用。不要自动触发。
 
-- 需要采集什么内容？默认按结构化格式整理：时间/顺序、来源人和群、对方诉求、我做了什么、工作产出/结论、是否适合写入报告素材。也可以指定特定主题或范围。
-- 我会根据已确认的报告周期生成默认采集提示词，你可以直接确认、修改或提供自己的提示词。
-- 如果报告周期已经解析为具体日期，默认采集提示词必须让周期标签和用户原话保持一致。用户说"上周"时，只能写"上周（YYYY-MM-DD 至 YYYY-MM-DD）"或直接写"YYYY-MM-DD 至 YYYY-MM-DD 期间"。周期标签不明时用"目标周期内"，不要把当前周标签和上一周日期范围混在一起。
+- **采集模式选择**：让用户选择"探针诊断"（`--probe-only`，只读，检测窗口状态）、"完整自动"（推荐路径）、"半自动"（`--semi-manual`）或"仅生成提示词"（`--prompt-only`）。首次采集或换了新窗口布局时建议先跑 `--probe-only`；返回用户已跑过探针且窗口布局未变时可直接选完整自动。
+- 对返回用户（同一会话或近期会话已完成过企微采集），可以紧凑询问："本次采集用完整自动模式？还是先探针检查一下窗口状态？" 不需要重复朗读完整前提清单，除非用户选了完整自动 — 此时仍需展示前提清单并等待确认。
+
+- 需要采集什么内容？默认采集提示词由 `scripts/collect_wecom_smart_summary.py` 的 `DEFAULT_PROMPT_BODY` 常量定义，运行 `--prompt-only` 可查看完整内容。用户也可以指定特定主题或范围（通过 `--prompt-file` 传入自定义提示词）。
+- 默认采集提示词来自 `scripts/collect_wecom_smart_summary.py` 的 `DEFAULT_PROMPT_BODY` 常量。展示给用户确认时，运行 `--prompt-only --period "<period>"` 获取脚本生成的规范提示词，不要自行编写或改写"默认提示词"。用户可以直接确认这个脚本输出、要求修改，或通过 `--prompt-file` 提供自己的提示词。
+- 如果报告周期已经解析为具体日期，`--prompt-only` 输出的周期标签会自动与用户原话保持一致（如 `--period "2026-06-29..2026-07-03"` 输出"总结 2026-06-29 至 2026-07-03 期间..."）。不要在展示脚本输出时把当前周标签和上一周日期范围混在一起。
 - 企微智能总结可能打开在三种状态：企微主聊天页、智能总结新建输入页、或上一次历史结果页。历史结果页不是本次证据，脚本应点击 `+` 新建本次总结后再输入提示词。
 - 企业微信窗口可任意伸缩，脚本不得使用左侧菜单纵向扫描或多点试探来找入口；找不到可验证入口时应停止并保存诊断。
 - 智能总结生成时间不固定，脚本会用结果页状态、文本稳定、结果操作区或复制按钮等可观察信号判断进度，固定超时只作为硬上限。
@@ -145,11 +167,11 @@ Use these when the conversation is about to go wrong:
 ```
 
 ```text
-你提到要采集企微智能总结。根据已确认的报告周期 [YYYY-MM-DD 到 YYYY-MM-DD]，我建议使用以下提示词：
+你提到要采集企微智能总结。根据已确认的报告周期 [YYYY-MM-DD 到 YYYY-MM-DD]，默认提示词来自脚本：
 
-[动态生成的默认 prompt。若用户原话是"上周"，写"总结上周（YYYY-MM-DD 至 YYYY-MM-DD）期间..."或"总结 YYYY-MM-DD 至 YYYY-MM-DD 期间..."；不要把当前周标签和上一周日期范围混在一起。]
+[运行 `python scripts/collect_wecom_smart_summary.py --prompt-only --period "YYYY-MM-DD..YYYY-MM-DD"`，将其输出的完整内容展示给用户。不要自行编写"默认提示词"或改写脚本输出。]
 
-你可以直接确认、修改提示词，或提供自己的提示词文件。
+你可以直接确认脚本输出的提示词、提出修改意见，或通过 `--prompt-file` 提供自定义提示词文件。
 ```
 
 ```text
