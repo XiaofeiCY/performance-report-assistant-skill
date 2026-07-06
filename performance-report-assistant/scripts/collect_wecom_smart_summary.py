@@ -970,6 +970,15 @@ def classify_page_structured(
     smart_summary_body_signals = [
         "开始总结", "输入你想总结", "暂无历史总结",
         "新建文档", "发送邮件", "总结团队周报", "总结聊天内容",
+        "+添加成员", "PRAS-",
+    ]
+
+    # Smart Summary header signals: fingerprint or prompt-instruction text in
+    # main_header is definitive for a Smart Summary content page (current or
+    # old result).  "采集标识" and "请在总结结果" are from the fingerprint
+    # instruction; "PRAS-" is the fingerprint prefix.
+    smart_summary_header_signals = [
+        "采集标识", "请在总结结果", "PRAS-",
     ]
 
     # Structured history list with multiple "总结" entries is strong evidence
@@ -977,14 +986,16 @@ def classify_page_structured(
     history_list_structured = history_list_text.count("总结") >= 2
 
     in_smart_summary = False
+    header_has_ss_signal = any(s in main_text for s in smart_summary_header_signals)
+    body_or_history_ok = any(s in body_text_early for s in smart_summary_body_signals) or history_list_structured
     if "智能总结" in main_text:
         in_smart_summary = True
     elif "智能总结" in sidebar_text:
-        if any(s in body_text_early for s in smart_summary_body_signals) or history_list_structured:
+        if body_or_history_ok or header_has_ss_signal:
             in_smart_summary = True
-    elif any(s in body_text_early for s in smart_summary_body_signals) or history_list_structured:
-        # Smart-summary body signals or structured history list are strong enough
-        # even without "智能总结" text — corroborated by UIA / child window entry evidence.
+    elif body_or_history_ok or header_has_ss_signal:
+        # Smart-summary body/header signals are strong enough even without
+        # "智能总结" text — corroborated by UIA / child window entry evidence.
         if uia_smart_summary_entry or child_smart_summary_entry:
             in_smart_summary = True
 
@@ -1073,6 +1084,12 @@ def classify_page_structured(
         if "复制" in all_text:
             history_signals.append("copy_button_present")
 
+    # Header fingerprint/prompt text (PRAS-..., 采集标识, 请在总结结果) is
+    # definitive evidence of a Smart Summary content page — the old fingerprint
+    # in the header means we are looking at a historical result, not a chat page.
+    if header_has_ss_signal:
+        history_signals.append("header_fingerprint_evidence")
+
     has_start_button = "开始总结" in all_text
     has_input_hints = any(kw in all_text for kw in ["输入你想总结", "暂无历史总结", "总结团队周报", "总结聊天内容"])
     if not has_start_button:
@@ -1088,10 +1105,11 @@ def classify_page_structured(
     history_conf = history_score / max(history_score + len(history_missing), 1)
 
     # History page requires at least one of: sidebar_history_items (dated list
-    # entries) or result_action_buttons ("新建文档/发送邮件/复制").  Long body
-    # text alone is NOT sufficient — ordinary chat pages also have long text.
+    # entries), result_action_buttons ("新建文档/发送邮件/复制"), or
+    # header_fingerprint_evidence (PRAS-/采集标识/请在总结结果 in main_header).
+    # Long body text alone is NOT sufficient — ordinary chat pages also have long text.
     has_history_structure = bool(history_signals) and any(
-        s in history_signals for s in ["sidebar_history_items", "result_action_buttons"]
+        s in history_signals for s in ["sidebar_history_items", "result_action_buttons", "header_fingerprint_evidence"]
     )
     if history_score >= 3 and has_history_structure and not (has_start_button and has_input_hints):
         return {
