@@ -20,22 +20,25 @@ AGENT.md
 Current state:
 
 - No pending Claude task.
-- Console-stage prompts for supervised WeCom collection have passed acceptance. Task doc: `docs/tasks/2026-07-06-wecom-console-stage-prompts.md`.
-- Temporary Windows keep-awake guard for supervised WeCom collection has passed second acceptance. Task doc: `docs/tasks/2026-07-06-wecom-keep-screen-awake.md`.
-- The weekly-report round for `2026-06-29 至 2026-07-03` is complete; the user accepted and used the draft.
-- The WeCom Smart Summary collector has a retained successful supervised run from `2026-07-06`.
-- The default WeCom prompt source fix, full-flow latency analysis helper, git evidence correctness return fix, and installed Claude skill sync have all been accepted.
-- Project reduction was completed after those acceptances; completed task handoff docs and stale diagnostics were removed.
+- Current handoff task is complete: project documentation was reduced and current status was consolidated.
+- Completed task handoff docs under `docs/tasks/` were removed after acceptance.
+- Python cache under `performance-report-assistant/scripts/__pycache__/` was removed.
+- Current retained report outputs and the latest successful WeCom run were kept.
 
-Current WeCom maintenance request:
+## Recent Accepted Work
 
-- User observed that longer supervised collection can trigger Windows display-off/sleep behavior.
-- Desired behavior: keep screen/system awake only during supervised collection, then release the request so previous power behavior resumes.
-- Recommended implementation: Windows `SetThreadExecutionState` context manager around the supervised desktop automation path; no `powercfg`, no mouse/keyboard simulation, no unattended positioning.
-- Acceptance round 1 result: rework required because keep-awake events were not written to the run trace, and `SetThreadExecutionState` return value `0` was not handled as failure.
-- Acceptance round 2 result: accepted. Non-live validation confirmed trace logging for enabled/disabled, correct return-0 failure handling, successful `py_compile`, and prompt-only still non-live. No live full-auto WeCom test was run.
-- New UX request: do not add breathing-light overlay because it may enter WeCom screenshots and affect OCR/template matching. Instead, add safer console-stage prompts for supervised collection progress.
-- Console-stage prompt acceptance result: accepted. Non-live validation confirmed stage banners are limited to supervised automation and prompt-only remains unchanged; no live full-auto WeCom test was run.
+WeCom Smart Summary collector:
+
+- Temporary Windows keep-awake guard accepted. During supervised desktop automation, the collector requests Windows to keep the display/system awake with `SetThreadExecutionState`, logs enable/disable/failure to the current run trace, and releases the request when the process exits.
+- Console-stage prompts accepted. The supervised automation path now prints clear stage banners without adding overlays, GUI windows, toasts, or anything that can enter WeCom screenshots.
+- History/result page classification fix accepted. Saved failure artifacts confirmed `cycle0` remains `main_page`, while `cycle1` and `cycle2` now classify as `summary_history_page`; old fingerprints are treated only as history/header evidence, not current-run result evidence.
+- Default WeCom prompt source fix accepted. Agents must show the default prompt from `collect_wecom_smart_summary.py --prompt-only` and must not invent a separate default prompt.
+
+Workflow and evidence:
+
+- Full-flow low-risk latency optimization accepted: added read-only `analyze_trace.py`, reduced unnecessary interview repetition, and did not change the WeCom core state machine or safety gates.
+- Git evidence correctness accepted: remote URL clones are full clone by default (`--shallow-depth 0`); shallow clone remains explicit opt-in only.
+- Installed Claude skill sync accepted on 2026-07-06.
 
 ## Current Retained Outputs
 
@@ -62,35 +65,6 @@ Key trace facts:
 - `copy_result phase=action_row_geometry region=lower_combined selected="复制" screen_coords=[564,1050]`
 - `copy_result method=ocr_direct result_len=1883 fingerprint_match=true`
 - `automation_complete fingerprint_match=true`
-
-## Accepted Changes Since Last Report
-
-WeCom default prompt source:
-
-- `performance-report-assistant/SKILL.md` now requires agents to show the default WeCom prompt from `collect_wecom_smart_summary.py --prompt-only`.
-- Agents must not invent or paraphrase a separate default prompt.
-- Custom prompts must be explicit, for example via `--prompt-file`.
-
-Full-flow latency optimization, low-risk phase:
-
-- Added `performance-report-assistant/scripts/analyze_trace.py`, a read-only trace timing analyzer.
-- Reduced unnecessary interview repetition through fast-path guidance in `SKILL.md` and `references/intake-questions.md`.
-- Did not change WeCom collector core state machine, OCR decisions, copy strategy, wait-result logic, fingerprint verification, or foreground/page-state safety checks.
-
-Git evidence correctness:
-
-- `collect_git_commits.py` restores correctness-first behavior: remote URL clones are full clone by default (`--shallow-depth 0`).
-- `--shallow-depth N` remains available only as explicit opt-in and is documented as unsafe for evidence-complete all-branches personal reports.
-- Offline validation confirmed default full clone sees commits on both default and non-default remote branches.
-
-Installed Claude skill sync:
-
-- Completed on 2026-07-06.
-- Source: `E:\work\performance-report-assistant-skill\performance-report-assistant`
-- Destination: `C:\Users\Lenovo\.claude\skills\performance-report-assistant`
-- Backup: `C:\Users\Lenovo\.claude\skills\performance-report-assistant.backup-20260706-110007`
-- Excluded from mirror sync: `outputs`, `agents`, `__pycache__`, `.git`, `*.pyc`, `pc_commits.md`, `mini_commits.md`.
-- Verified key file hashes and installed-copy `py_compile`.
 
 ## Report Evidence Snapshot
 
@@ -159,18 +133,23 @@ WeCom automation:
 
 Project reduction completed on 2026-07-06.
 
-Deleted:
+Deleted in this cleanup:
 
 - Completed task handoff docs from `docs/tasks/`.
+- Python cache directory `performance-report-assistant/scripts/__pycache__/`.
+
+Previously deleted in earlier cleanup:
+
 - Old WeCom run directory `outputs/wecom_runs/20260703-160202-REJ2/`.
 - Temporary git statistics outputs `outputs/commits_mini.md` and `outputs/commits_webapp.md`.
-- Python cache directory `performance-report-assistant/scripts/__pycache__/`.
+- Earlier Python cache files.
 
 Kept:
 
 - Short recovery entry docs: `AGENTS.md`, `docs/status.md`.
 - Current report outputs and latest successful WeCom diagnostic run.
 - Core skill, scripts, references, README files, template assets, and agent metadata.
+- Tracked validation/extraction helper scripts, because they are repository tooling rather than disposable handoff docs.
 
 ## If Work Continues
 
