@@ -1,8 +1,8 @@
 # Project Status
 
-## Current Handoff Snapshot (2026-07-06)
+## Current Handoff Snapshot (2026-07-07)
 
-This is the first section to read after switching Codex / Claude windows.
+Read this section immediately after switching Codex / Claude windows.
 
 Project entry file:
 
@@ -20,48 +20,54 @@ AGENT.md
 Current state:
 
 - No pending Claude task.
-- Current handoff task is complete: project documentation was reduced and current status was consolidated.
-- Completed task handoff docs under `docs/tasks/` were removed after acceptance.
-- Python cache under `performance-report-assistant/scripts/__pycache__/` was removed.
-- Current retained report outputs and the latest successful WeCom run were kept.
-
-Accepted task document:
-
-```text
-docs/tasks/2026-07-06-output-location-safety.md
-```
-
-Trigger:
-
-- User tested the installed skill from a random business repository and observed that the agent created `outputs/` plus git/WeCom artifacts under that repository without first asking for an output location.
-- This is considered a safety issue because evidence repositories must not be treated as implicit output destinations.
-
-Acceptance state:
-
-- Output-location safety accepted after final Codex review.
-- Relative file-writing outputs are rejected by script-side guardrails for git evidence, WeCom markdown/JSON outputs, WeCom diagnostic directories, and Excel template filling.
-- `collect_git_commits.py` without `--output` remains stdout-only and file-free.
-- `collect_wecom_smart_summary.py --prompt-only` remains file-free and prints absolute placeholder save commands.
-- Installed Claude skill copies were synchronized and verified by SHA256.
+- Recent WeCom and output-safety work has been accepted and consolidated here.
+- Completed / deferred task handoff docs under `docs/tasks/` have been removed after consolidation.
+- Python cache under `performance-report-assistant/scripts/__pycache__/` has been removed again.
+- The old retained WeCom diagnostic run directory was removed after key trace facts were consolidated here.
+- Current report deliverables remain in `outputs/`.
 
 ## Recent Accepted Work
 
-WeCom Smart Summary collector:
+Output location safety:
 
-- Temporary Windows keep-awake guard accepted. During supervised desktop automation, the collector requests Windows to keep the display/system awake with `SetThreadExecutionState`, logs enable/disable/failure to the current run trace, and releases the request when the process exits.
-- Console-stage prompts accepted. The supervised automation path now prints clear stage banners without adding overlays, GUI windows, toasts, or anything that can enter WeCom screenshots.
-- History/result page classification fix accepted. Saved failure artifacts confirmed `cycle0` remains `main_page`, while `cycle1` and `cycle2` now classify as `summary_history_page`; old fingerprints are treated only as history/header evidence, not current-run result evidence.
-- Default WeCom prompt source fix accepted. Agents must show the default prompt from `collect_wecom_smart_summary.py --prompt-only` and must not invent a separate default prompt.
+- The skill must confirm an output location before any file-writing command.
+- Evidence repositories are inputs only, not implicit output destinations.
+- Script-side guardrails reject relative file-writing paths for:
+  - `collect_git_commits.py --output`
+  - `collect_wecom_smart_summary.py --output`
+  - `collect_wecom_smart_summary.py --output-json`
+  - `collect_wecom_smart_summary.py --screenshot-dir`
+  - `fill_excel_template.py --output`
+- `collect_git_commits.py` without `--output` remains stdout-only and file-free.
+- `collect_wecom_smart_summary.py --prompt-only` remains file-free and prints absolute placeholder save commands.
+- Installed Claude skill copies were synchronized and verified by SHA256 during acceptance.
+
+WeCom progress and diagnostics lifecycle:
+
+- Full-auto stage/progress messages flush immediately.
+- `SKILL.md` instructs agents to use `python -u` for live WeCom collection so progress is visible.
+- `--diagnostics-policy on-failure|keep` is available.
+- Default `on-failure` policy cleans transient diagnostics after successful full-auto output save and fingerprint verification.
+- Cleanup is guarded by run-directory identity and final-output-file checks; it must not delete final outputs or user files.
+- Failed runs keep diagnostics and write `failure_summary.md`.
+- `--probe-only` remains diagnostic by nature, so successful probe diagnostics may be retained for inspection.
+
+WeCom collector maintenance already accepted:
+
+- Windows keep-awake guard during supervised desktop automation.
+- Console-only stage prompts; no overlay, GUI, toast, or visual element over WeCom.
+- History/result page classification fix: old Smart Summary result pages no longer classify as ordinary `main_page`; old fingerprints are history evidence only.
+- Default WeCom prompt source fix: agents must show the default prompt from `collect_wecom_smart_summary.py --prompt-only`.
 
 Workflow and evidence:
 
-- Full-flow low-risk latency optimization accepted: added read-only `analyze_trace.py`, reduced unnecessary interview repetition, and did not change the WeCom core state machine or safety gates.
-- Git evidence correctness accepted: remote URL clones are full clone by default (`--shallow-depth 0`); shallow clone remains explicit opt-in only.
-- Installed Claude skill sync accepted on 2026-07-06.
+- Full-flow low-risk latency optimization accepted: added read-only `analyze_trace.py`, reduced unnecessary interview repetition, and preserved the WeCom safety gates.
+- Git evidence correctness accepted: remote URL clones are full clone by default; shallow clone remains explicit opt-in only.
+- Installed Claude skill sync accepted after recent changes.
 
 ## Current Retained Outputs
 
-Keep these current-period report outputs:
+Keep these accepted report outputs:
 
 ```text
 outputs/weekly_report_2026-06-29_2026-07-03.md
@@ -70,31 +76,31 @@ outputs/wecom_summary_live_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.json
 ```
 
-Latest retained successful WeCom diagnostic run:
+The old diagnostic run directory below has been deleted during the 2026-07-07 cleanup:
 
 ```text
 outputs/wecom_runs/20260706-102206-RRI8/
 ```
 
-Key trace facts:
+Retained key facts from that deleted successful run:
 
 - Fingerprint: `PRAS-20260706-102206-5678`
 - `paste_verify visible_fingerprint=true`
 - `copy_result phase=fp_scroll context_confirmed=true use_frame=fp_scroll_1`
-- `copy_result phase=action_row_geometry region=lower_combined selected="复制" screen_coords=[564,1050]`
+- `copy_result phase=action_row_geometry region=lower_combined selected="copy" screen_coords=[564,1050]`
 - `copy_result method=ocr_direct result_len=1883 fingerprint_match=true`
 - `automation_complete fingerprint_match=true`
 
-## Report Evidence Snapshot
+## Accepted Report Evidence Snapshot
 
-Report type: 周报
+Report type: weekly report
 
-Audience: 直属领导
+Audience: direct manager
 
 Period:
 
 ```text
-2026-06-29 至 2026-07-03
+2026-06-29 to 2026-07-03
 ```
 
 Git evidence used for the accepted report:
@@ -107,7 +113,7 @@ http://47.105.186.81:9006/asi2.x/asi-station-webapp.git
 Scope:
 - Branches: all branches
 - Author: chayne
-- Period: 2026-06-29 至 2026-07-03
+- Period: 2026-06-29 to 2026-07-03
 
 Fallback:
 - Remote access timed out during the accepted report round.
@@ -133,7 +139,7 @@ Current-period evidence:
 
 Template memory:
 
-- User-provided templates/examples/accepted drafts are current-task references by default.
+- User-provided templates, examples, and accepted drafts are current-task references by default.
 - Do not save them as global/default templates unless the user explicitly agrees.
 
 Git evidence:
@@ -147,15 +153,18 @@ WeCom automation:
 - Do not run full-auto WeCom live automation unless the user again supervises and explicitly authorizes it.
 - Do not describe the collector as unattended, cross-environment stable, or generally compatible with all WeCom UI variants.
 - Forbidden: sending/deleting/editing/forwarding messages, continuing when WeCom is not foreground, right-click copy, unknown-area `Ctrl+A/Ctrl+C`, multi-fixed-coordinate probing, left-menu vertical scanning, or clicking body text/URLs to obtain scroll focus.
+- If copy-stage instability recurs, first request the failed run-specific `--screenshot-dir` and inspect `trace.jsonl`, `ocr/`, and `regions/` before proposing code changes.
 
 ## Cleanup Completed
 
-Project reduction completed on 2026-07-06.
+Project reduction completed on 2026-07-07.
 
 Deleted in this cleanup:
 
 - Completed task handoff docs from `docs/tasks/`.
+- Deferred copy-stage task handoff doc after status consolidation.
 - Python cache directory `performance-report-assistant/scripts/__pycache__/`.
+- Old WeCom diagnostic run directory `outputs/wecom_runs/20260706-102206-RRI8/`.
 
 Previously deleted in earlier cleanup:
 
@@ -166,7 +175,7 @@ Previously deleted in earlier cleanup:
 Kept:
 
 - Short recovery entry docs: `AGENTS.md`, `docs/status.md`.
-- Current report outputs and latest successful WeCom diagnostic run.
+- Current accepted report outputs listed above.
 - Core skill, scripts, references, README files, template assets, and agent metadata.
 - Tracked validation/extraction helper scripts, because they are repository tooling rather than disposable handoff docs.
 
