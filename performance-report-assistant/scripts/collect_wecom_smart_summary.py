@@ -2596,15 +2596,15 @@ def _clean_old_artifacts(run_dir: Path) -> None:
 
 def _print_countdown(seconds: int = 3) -> None:
     """Print a short countdown advising the user not to touch mouse/keyboard."""
-    print()
-    print("=" * 60)
-    print("采集期间请不要操作鼠标键盘。")
-    print("若需要接管，请等待本轮结束或按 Ctrl+C 中断。")
-    print("=" * 60)
+    print(flush=True)
+    print("=" * 60, flush=True)
+    print("采集期间请不要操作鼠标键盘。", flush=True)
+    print("若需要接管，请等待本轮结束或按 Ctrl+C 中断。", flush=True)
+    print("=" * 60, flush=True)
     for i in range(seconds, 0, -1):
-        print(f"  {i}...")
+        print(f"  {i}...", flush=True)
         time.sleep(1)
-    print()
+    print(flush=True)
 
 
 def _require_explicit_output_dir(screenshot_dir: str, mode: str) -> None:
@@ -2665,6 +2665,7 @@ def run_probe_only(args: argparse.Namespace) -> int:
     if main_hwnd is None or window_rect is None:
         print("企微探针失败：未找到企业微信窗口。")
         trace.log(event="probe_end", error="no_wecom_window")
+        _write_failure_summary("未找到企业微信窗口，请确认企业微信已启动且窗口可见。", "probe", str(run_dir))
         return 1
 
     width = window_rect.right - window_rect.left
@@ -2697,6 +2698,7 @@ def run_probe_only(args: argparse.Namespace) -> int:
             print("请关闭可能抢占前台的窗口后重试 --probe-only。")
             print(f"诊断目录：{run_dir}")
             trace.log(event="probe_end", error="foreground_recovery_failed", **fg_after)
+            _write_failure_summary("多次尝试后仍无法将企业微信置于前台。请关闭可能抢占前台的窗口后重试。", "probe", str(run_dir))
             return 1
 
         print("企微探针：企业微信已成功置前，继续只读诊断。")
@@ -2706,6 +2708,7 @@ def run_probe_only(args: argparse.Namespace) -> int:
             print(f"企微探针失败：置前后再次校验失败，前台可能已被其它窗口抢占。")
             print(f"  当前前台：class={fg_final['class']} title={fg_final['title'][:80]}")
             trace.log(event="probe_end", error="foreground_lost_after_recovery", **fg_final)
+            _write_failure_summary("置前后再次校验失败，前台可能已被其它窗口抢占。", "probe", str(run_dir))
             return 1
 
     # Countdown warning
@@ -2717,6 +2720,7 @@ def run_probe_only(args: argparse.Namespace) -> int:
         frame = capture_trusted_frame(main_hwnd, window_rect, trace, "probe")
     except SystemExit:
         # capture_trusted_frame already printed diagnostics
+        _write_failure_summary("截图前/后企业微信前台丢失，可能被其它窗口遮挡。", "probe", str(run_dir))
         return 1
 
     # Save all artifacts from the same frame
@@ -2740,14 +2744,15 @@ def run_probe_only(args: argparse.Namespace) -> int:
     # Check for tainted (non-WeCom content detected in OCR)
     if state.get("tainted"):
         print()
-        print("=" * 60)
-        print("企微探针安全失败：检测到非企业微信内容")
-        print("=" * 60)
-        print(f"页面状态：{state['state']}（置信度 {state['confidence']}）")
-        print(f"拒绝原因：OCR 检测到非企微内容，截图可能被其它窗口遮挡。")
-        print("请确保企业微信窗口在最前且无遮挡后重试。")
-        print(f"诊断目录：{run_dir}")
+        print("=" * 60, flush=True)
+        print("企微探针安全失败：检测到非企业微信内容", flush=True)
+        print("=" * 60, flush=True)
+        print(f"页面状态：{state['state']}（置信度 {state['confidence']}）", flush=True)
+        print(f"拒绝原因：OCR 检测到非企微内容，截图可能被其它窗口遮挡。", flush=True)
+        print("请确保企业微信窗口在最前且无遮挡后重试。", flush=True)
+        print(f"诊断目录：{run_dir}", flush=True)
         trace.log(event="probe_end", error="tainted_content_detected")
+        _write_failure_summary("OCR 检测到非企微内容，截图可能被其它窗口遮挡。请确保企业微信窗口在最前且无遮挡后重试。", "probe", str(run_dir))
         return 1
 
     # Check template availability
@@ -2808,10 +2813,10 @@ def run_probe_only(args: argparse.Namespace) -> int:
 
 def _stage(msg: str) -> None:
     """Print a stage banner for supervised collection progress visibility."""
-    print()
-    print("-" * 40)
-    print(f"  {msg}")
-    print("-" * 40)
+    print(flush=True)
+    print("-" * 40, flush=True)
+    print(f"  {msg}", flush=True)
+    print("-" * 40, flush=True)
 
 
 def run_automation(args: argparse.Namespace) -> str:
@@ -2851,9 +2856,9 @@ def run_automation(args: argparse.Namespace) -> str:
 
     _stage("阶段 1/6：初始化")
 
-    print(f"运行 ID：{run_id}")
-    print(f"采集指纹：{fingerprint}")
-    print(f"诊断目录：{run_dir}")
+    print(f"运行 ID：{run_id}", flush=True)
+    print(f"采集指纹：{fingerprint}", flush=True)
+    print(f"诊断目录：{run_dir}", flush=True)
 
     prompt = load_prompt(args)
     fp_instruction = make_fingerprint_instruction(fingerprint)
@@ -2949,7 +2954,7 @@ def run_automation(args: argparse.Namespace) -> str:
         st = classify_page_structured(frame, reader, trace, f"cycle{recovery_cycles}", fingerprint)
         page_state = st["state"]
         trace.log(event="state_machine_cycle", cycle=recovery_cycles, page_state=page_state, **st)
-        print(f"企微：状态机 (循环 {recovery_cycles}) → {page_state} (conf={st['confidence']})")
+        print(f"企微：状态机 (循环 {recovery_cycles}) → {page_state} (conf={st['confidence']})", flush=True)
 
         if st.get("tainted"):
             _save_diagnostics_and_exit(
@@ -3085,7 +3090,7 @@ def run_automation(args: argparse.Namespace) -> str:
             str(run_dir),
         )
     else:
-        print(f"企微：粘贴提示词（{len(prompt)} 字符）...")
+        print(f"企微：粘贴提示词（{len(prompt)} 字符）...", flush=True)
         clear_ocr_cache()
         fp_visible = _action_paste_prompt(main_hwnd, window_rect, prompt, reader, trace)
 
@@ -3101,7 +3106,7 @@ def run_automation(args: argparse.Namespace) -> str:
         if not _global_ok("click_start"):
             _save_diagnostics_and_exit("全局超时", "click_start", str(run_dir))
 
-        print("企微：点击开始总结...")
+        print("企微：点击开始总结...", flush=True)
         clear_ocr_cache()
         clicked = _action_click_start(main_hwnd, window_rect, reader, trace)
         if not clicked:
@@ -3118,7 +3123,7 @@ def run_automation(args: argparse.Namespace) -> str:
     if not _global_ok("wait"):
         _save_diagnostics_and_exit("全局超时", "wait_generation", str(run_dir))
 
-    print("企微：等待智能总结生成...")
+    print("企微：等待智能总结生成...", flush=True)
     clear_ocr_cache()
     wait_state = _action_wait_result(
         main_hwnd, window_rect, reader, trace, fingerprint,
@@ -3151,7 +3156,7 @@ def run_automation(args: argparse.Namespace) -> str:
     if not _global_ok("copy"):
         _save_diagnostics_and_exit("全局超时", "copy_result", str(run_dir))
 
-    print("企微：定位并点击复制按钮...")
+    print("企微：定位并点击复制按钮...", flush=True)
     clear_ocr_cache()
     result = _action_copy_result(main_hwnd, window_rect, reader, trace, fingerprint)
     if result is None:
@@ -3170,7 +3175,7 @@ def run_automation(args: argparse.Namespace) -> str:
             str(run_dir),
         )
 
-    print(f"企微：指纹校验通过，结果 {len(result)} 字符。")
+    print(f"企微：指纹校验通过，结果 {len(result)} 字符。", flush=True)
     trace.log(event="automation_complete", result_len=len(result), fingerprint_match=True)
 
     return result
@@ -3182,10 +3187,125 @@ def run_automation(args: argparse.Namespace) -> str:
 
 
 def _save_diagnostics_and_exit(reason: str, stage: str, run_dir: str, exit_code: int = 1) -> None:
-    print(f"\n企微采集失败 [{stage}]：{reason}")
-    print(f"诊断目录：{run_dir}")
-    print("建议：改用手动模式（--manual-input）、半自动模式（--semi-manual）或只生成提示词（--prompt-only）。")
+    """Print a structured failure summary, write failure_summary.md, keep diagnostics, exit."""
+    _write_failure_summary(reason, stage, run_dir)
+    print(f"\n{'=' * 60}", flush=True)
+    print(f"采集失败：{stage}", flush=True)
+    print(f"原因：{reason}", flush=True)
+    print(f"诊断目录：{run_dir}", flush=True)
+    print(f"诊断已保留，可交给开发者分析。", flush=True)
+    print(f"{'=' * 60}", flush=True)
+    print(f"", flush=True)
+    print(f"建议：", flush=True)
+    print(f"  - 可以重试一次 full-auto", flush=True)
+    print(f"  - 如果重复失败，请把诊断目录交给 Codex/Claude 分析", flush=True)
+    print(f"  - 临时绕过方式：使用 --manual-input 或 --semi-manual", flush=True)
+    if Path(run_dir).is_dir():
+        print(f"  - 失败摘要已写入：{Path(run_dir) / 'failure_summary.md'}", flush=True)
     sys.exit(exit_code)
+
+
+def _write_failure_summary(reason: str, stage: str, run_dir: str) -> None:
+    """Write failure_summary.md to the run directory if it exists."""
+    try:
+        rd = Path(run_dir)
+        if not rd.is_dir():
+            return
+        summary_path = rd / "failure_summary.md"
+        retry_safe_stages = {"find_window", "normalize", "state_machine", "open_entry",
+                             "open_smart_summary", "history_to_input", "generating_to_input",
+                             "paste_verify_failed", "start_button_not_found",
+                             "wait_generation", "copy_result", "fingerprint_verify",
+                             "paste_and_start"}
+        is_retry_safe = stage in retry_safe_stages
+        content = f"""# WeCom Smart Summary Collection Failure
+
+- **Failed stage**: {stage}
+- **Reason**: {reason}
+- **Run directory**: {run_dir}
+- **Retry safe**: {'是 — 可以重新运行 full-auto' if is_retry_safe else '不确定 — 请检查诊断文件'}
+
+## Next steps
+
+1. 检查诊断目录下的 `trace.jsonl` 了解事件序列
+2. 查看阶段截图 (`*.png`) 了解当时企微窗口状态
+3. 查看区域 OCR 文本 (`ocr/*.txt`) 了解页面内容识别结果
+
+## Fallback options
+
+- 使用 `--semi-manual` 提示用户手动操作企微
+- 使用 `--manual-input` 粘贴已有的智能总结结果
+- 使用 `--prompt-only` 仅生成提示词自行操作
+"""
+        summary_path.write_text(content, encoding="utf-8", errors="replace")
+    except Exception:
+        pass  # best-effort only
+
+
+def _cleanup_run_diagnostics(screenshot_dir: str) -> bool:
+    """Remove the current run diagnostic directory. Returns True on success.
+
+    Safety checks (all must pass):
+    1. Path must not look like a system/root/home/Desktop/Downloads/drive-root dir.
+    2. Directory name must match YYYYMMDD-HHMMSS-XXXX run-id pattern, OR parent must
+       be named 'wecom_runs' AND the directory contains trace.jsonl.
+    3. Directory must NOT contain final output files (.md, .json, .docx, .xlsx,
+       .pptx) except for allowed diagnostics (trace.jsonl, failure_summary.md).
+    """
+    import re
+    rd = Path(screenshot_dir)
+    if not rd.is_dir():
+        return False
+
+    # ---- Broad / unsafe path rejection ----
+    # Reject only when the run dir is at or near a dangerous top-level location:
+    # direct child of drive root, Desktop, Documents, Downloads, or home directory.
+    run_id_pattern = re.compile(r"^\d{8}-\d{6}-[A-Z0-9]{4}$")
+    parts_lower = [p.lower() for p in rd.parts]
+    dangerous_parents = {"desktop", "documents", "downloads"}
+    # Check: immediate parent is Desktop/Documents/Downloads
+    if len(rd.parts) >= 2 and rd.parent.name.lower() in dangerous_parents:
+        print(f"企微：安全拒绝 — 目录位于 {rd.parent.name} 下，不清理：{rd}", flush=True)
+        return False
+    # Check: path is very short and likely at drive root or home level
+    if len(rd.parts) <= 3:
+        sys_segments = {"users", "windows", "system32", "program files", "program files (x86)"}
+        for p in parts_lower:
+            if p in sys_segments or (len(p) == 2 and p.endswith(":")):
+                print(f"企微：安全拒绝 — 路径过短且包含系统目录，不清理：{rd}", flush=True)
+                return False
+
+    # ---- Run-directory identity check ----
+    name_is_run_id = bool(run_id_pattern.match(rd.name))
+    parent_is_wecom_runs = rd.parent.name.lower() == "wecom_runs"
+    has_trace = (rd / "trace.jsonl").exists()
+
+    if not name_is_run_id and not (parent_is_wecom_runs and has_trace):
+        if not name_is_run_id:
+            print(f"企微：安全拒绝 — 目录名不符合运行 ID 格式 (YYYYMMDD-HHMMSS-XXXX)：{rd.name}", flush=True)
+        else:
+            print(f"企微：安全拒绝 — 目录不像是采集运行目录（缺少 trace.jsonl）：{rd}", flush=True)
+        return False
+
+    # ---- Final output file check ----
+    # Allowed diagnostic file names — these are transient diagnostics, not final outputs.
+    allowed_names = {"trace.jsonl", "failure_summary.md"}
+    output_extensions = {".md", ".json", ".docx", ".xlsx", ".pptx"}
+    for entry in rd.iterdir():
+        if entry.is_file():
+            ext = entry.suffix.lower()
+            if ext in output_extensions and entry.name.lower() not in allowed_names:
+                print(f"企微：安全拒绝 — 目录包含最终输出文件 '{entry.name}'，不清理：{rd}", flush=True)
+                return False
+
+    # ---- Safe to delete ----
+    try:
+        shutil.rmtree(rd, ignore_errors=True)
+        print(f"企微：成功运行，已清理诊断目录：{rd}", flush=True)
+        return True
+    except Exception as exc:
+        print(f"企微：清理诊断目录失败（{exc}），诊断文件保留在：{rd}", flush=True)
+        return False
 
 
 def require_windows() -> None:
@@ -3433,6 +3553,9 @@ def main() -> int:
     parser.add_argument("--from-clipboard", action="store_true", help="With --manual-input: read text from clipboard.")
     parser.add_argument("--screenshot-dir", default="",
                         help="Absolute path for diagnostic run directory (required for probe/full-auto modes).")
+    parser.add_argument("--diagnostics-policy", default="on-failure", choices=["on-failure", "keep"],
+                        help="Diagnostics retention policy: 'on-failure' (default) cleans run diagnostics on success, "
+                             "'keep' always retains diagnostics.")
     parser.add_argument("--max-wait-seconds", type=int, default=180,
                         help="Hard upper limit for summary generation wait (default 180).")
     parser.add_argument("--stable-seconds", type=int, default=15,
@@ -3472,13 +3595,22 @@ def main() -> int:
 
     if args.output:
         write_markdown(args.output, args.scenario, args.period, collection_method, raw_summary)
-        print(f"Markdown saved: {args.output}")
+        print(f"Markdown saved: {args.output}", flush=True)
     else:
         print(raw_summary)
 
     if args.output_json:
         write_json(args.output_json, args.scenario, args.period, collection_method, raw_summary)
-        print(f"JSON saved: {args.output_json}")
+        print(f"JSON saved: {args.output_json}", flush=True)
+
+    # Diagnostics lifecycle: on success with on-failure policy, clean transient diagnostics.
+    if collection_method == "desktop_automation" and args.diagnostics_policy == "on-failure":
+        if args.screenshot_dir:
+            _cleanup_run_diagnostics(args.screenshot_dir)
+        else:
+            print("企微：未提供 --screenshot-dir，跳过诊断清理。", flush=True)
+    elif collection_method == "desktop_automation" and args.diagnostics_policy == "keep":
+        print(f"企微：诊断策略为 keep，诊断文件保留在：{args.screenshot_dir}", flush=True)
 
     return 0
 
