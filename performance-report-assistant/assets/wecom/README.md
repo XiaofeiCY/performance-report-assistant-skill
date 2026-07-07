@@ -19,5 +19,6 @@ Examples:
 - Do NOT fabricate template images. If no template file exists for a control,
   the automation will fall back to OCR and log a missing-template warning.
 - To create templates: run `--probe-only`, inspect the region screenshots in
+  the configured run diagnostics directory, such as
   `outputs/wecom_runs/<run-id>/regions/`, crop the target control, and save it
   here with the appropriate name.

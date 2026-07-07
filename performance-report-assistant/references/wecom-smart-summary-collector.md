@@ -6,40 +6,53 @@ This collector is a user-supervised desktop automation path. Do not describe it 
 
 ## Current Status
 
-Latest retained successful current-period run:
-
-```text
-outputs/wecom_runs/20260706-102206-RRI8/
-```
-
-Fingerprint:
-
-```text
-PRAS-20260706-102206-5678
-```
-
-Outputs:
+Current accepted report outputs:
 
 ```text
 outputs/wecom_summary_live_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.json
 ```
 
-Trace result:
+No WeCom diagnostic run directory is currently retained under project `outputs/`.
+The old successful diagnostic run below was deleted after key facts were consolidated into `docs/status.md`:
 
 ```text
-automation_complete
-fingerprint_match=true
+outputs/wecom_runs/20260706-102206-RRI8/
+```
+
+Retained facts from that deleted successful run:
+
+```text
+fingerprint=PRAS-20260706-102206-5678
+automation_complete fingerprint_match=true
 copy method=lower_combined ocr_direct
 ```
 
-The current collector path has completed supervised end-to-end live runs. The latest retained run copied through the `lower_combined` action-row path after `fp_scroll_1` confirmed the current result and action row. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
+Latest accepted copy-stage maintenance:
+
+```text
+2026-07-07 bottom action bar copy-button fix
+```
+
+Failed run investigated for that fix:
+
+```text
+C:\Users\Lenovo\Desktop\wecom_runs\20260707-104525-A7K2\
+```
+
+The current collector path has completed supervised end-to-end live runs, and the copy stage has been hardened for the fixed bottom action row where the copy action appears in the bottom bar. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
 
 Accepted maintenance on 2026-07-06:
 
 - Windows keep-awake guard: supervised desktop automation temporarily requests system/display awake with `SetThreadExecutionState`, logs keep-awake events to the current run trace, and releases the request on process exit.
 - Console stage prompts: supervised automation prints terminal-only stage banners. No overlay, GUI, toast, or visual element may cover WeCom because visible UI can enter screenshots and affect OCR/template matching.
 - History/result page classification: old Smart Summary result pages with header fingerprint/prompt evidence can classify as `summary_history_page` so the existing trusted `+` new-summary path can proceed. Old fingerprints are history evidence only; final clipboard verification still requires the exact current fingerprint.
+
+Accepted maintenance on 2026-07-07:
+
+- Bottom action bar copy-button fix: after current result-page context is confirmed, the collector runs lower combined bottom-of-window search even when `main_body` OCR does not see result-action signals.
+- Copy-stage diagnostics include `lower_combined_search`, `combined_text_preview`, and `action_signals_found`.
+- Final clipboard verification still requires the exact current fingerprint.
 
 ## Supported Modes
 
@@ -119,6 +132,7 @@ Allowed copy strategies after current result context is confirmed:
 
 - real template match if a valid copy template exists;
 - constrained OCR inside `main_body` / result action area;
+- lower combined bottom-of-window OCR and action-row geometry for fixed bottom action bars;
 - bounded result-area scrolling;
 - action-row geometry fallback for merged or partially missed result actions.
 
@@ -130,7 +144,7 @@ Forbidden copy strategies:
 - whole-window arbitrary OCR click;
 - continuing after foreground leaves WeCom.
 
-Current real `copy_1080p_light.png` template is not required for the retained successful run. If future repeated runs show copy instability, create a narrow task for a real copy template or additional result-action-row hardening.
+Current real `copy_1080p_light.png` template is not required for the accepted path. If future repeated runs show copy instability, first inspect the failed run-specific diagnostics before creating a narrow task for a real copy template or additional result-action-row hardening.
 
 ## Safety Boundaries
 
@@ -163,7 +177,7 @@ Forbidden:
 
 ## Diagnostics
 
-Each run writes:
+Each run writes diagnostics under the configured `--screenshot-dir` or default output run directory:
 
 ```text
 outputs/wecom_runs/<run-id>/
