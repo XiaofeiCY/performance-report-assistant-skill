@@ -2371,84 +2371,101 @@ def _action_copy_result(
                               fingerprint_match=True)
                     return result.strip()
 
-        # Strategy 2: Action-row geometry estimation (reuses lower_results)
-        if _action_row_visible:
-            est_x, est_y, est_method, est_info = _estimate_copy_from_action_row(
-                lower_results, mb_left, mb_top + int(mb_h * 0.30),
-                mb.width, mb_h - int(mb_h * 0.30), trace,
-            )
-            trace.log(stage="copy_result", phase="action_row_geometry",
-                      action_row_visible=True, **est_info)
-            trace.log(stage="copy_result", phase="copy_timing",
-                      step="action_row_geometry", elapsed_ms=_elapsed())
-            if est_x is not None and est_y is not None:
-                print(f"企微：操作行几何定位 ({est_method}) @ ({est_x},{est_y})，点击。")
-                pyperclip.copy("")
-                ensure_wecom_foreground(main_hwnd)
-                interception.move_to(est_x, est_y)
-                time.sleep(0.1)
-                interception.click(button="left")
-                time.sleep(0.6)
-                result = pyperclip.paste()
-                if result and len(result.strip()) >= 10:
-                    if fingerprint and fingerprint not in result:
-                        print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
-                        trace.log(stage="copy_result", method=est_method, fingerprint_match=False)
-                        return None
-                    trace.log(stage="copy_result", method=est_method, result_len=len(result),
-                              fingerprint_match=True)
-                    return result.strip()
-                print("企微：几何定位点击后剪贴板为空或过短，继续尝试。")
-            else:
-                print("企微：操作行信号存在但几何定位未产生有效候选，尝试底部合并区。")
+        # Strategy 2: Action-row geometry estimation (reuses lower_results).
+        # Always run — _estimate_copy_from_action_row naturally returns
+        # (None, None) when no action signals are present.  Do not gate
+        # on _action_row_visible from main_body OCR: the action row may
+        # sit in bottom_action_bar and be absent from main_body all_text.
+        est_x, est_y, est_method, est_info = _estimate_copy_from_action_row(
+            lower_results, mb_left, mb_top + int(mb_h * 0.30),
+            mb.width, mb_h - int(mb_h * 0.30), trace,
+        )
+        trace.log(stage="copy_result", phase="action_row_geometry",
+                  action_row_visible=_action_row_visible,
+                  region="main_body_lower", **est_info)
+        trace.log(stage="copy_result", phase="copy_timing",
+                  step="action_row_geometry", elapsed_ms=_elapsed())
+        if est_x is not None and est_y is not None:
+            print(f"企微：操作行几何定位 ({est_method}) @ ({est_x},{est_y})，点击。")
+            pyperclip.copy("")
+            ensure_wecom_foreground(main_hwnd)
+            interception.move_to(est_x, est_y)
+            time.sleep(0.1)
+            interception.click(button="left")
+            time.sleep(0.6)
+            result = pyperclip.paste()
+            if result and len(result.strip()) >= 10:
+                if fingerprint and fingerprint not in result:
+                    print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
+                    trace.log(stage="copy_result", method=est_method, fingerprint_match=False)
+                    return None
+                trace.log(stage="copy_result", method=est_method, result_len=len(result),
+                          fingerprint_match=True)
+                return result.strip()
+            print("企微：几何定位点击后剪贴板为空或过短，继续尝试。")
+        elif _action_row_visible:
+            print("企微：操作行信号存在但几何定位未产生有效候选，尝试底部合并区。")
+        else:
+            print("企微：主内容区未检测到操作区信号，尝试底部合并区。")
     elif not _action_row_visible:
         trace.log(stage="copy_result", phase="action_row_geometry",
                   action_row_visible=False,
                   reason="no_action_signals_in_current_view")
-        print("企微：当前视图未检测到操作区信号，将在滚动中搜索。")
+        print("企微：当前视图未检测到操作区信号，尝试底部合并区。")
     # ---- Lower combined: bottom 30% of full image ----
     # Action-row may straddle the main_body / bottom_action_bar boundary.
     # Crop the bottom 30% of the full image as a single search area.
-    if _action_row_visible:
-        from PIL import Image
-        t_lc = _time.time()
-        combined = copy_frame.full_image.crop((
-            0,
-            int(copy_frame.full_image.height * 0.70),
-            copy_frame.full_image.width,
-            copy_frame.full_image.height,
-        ))
-        combined_results = ocr_all_multi(combined, reader, 0.03)
-        combined_text = " ".join([t for _, t, _ in combined_results])
-        trace.log(stage="copy_result", phase="copy_timing",
-                  step="lower_combined_ocr", elapsed_ms=_elapsed(t_lc))
-        if any(kw in combined_text for kw in _ACTION_SIGNALS):
-            combined_left = window_rect.left
-            combined_top = window_rect.top + int(height * 0.70)
-            est_x3, est_y3, est_method3, est_info3 = _estimate_copy_from_action_row(
-                combined_results, combined_left, combined_top,
-                combined.width, combined.height, trace,
-            )
-            trace.log(stage="copy_result", phase="action_row_geometry",
-                      action_row_visible=True, region="lower_combined", **est_info3)
-            if est_x3 is not None and est_y3 is not None:
-                print(f"企微：底部合并区几何定位 ({est_method3}) @ ({est_x3},{est_y3})，点击。")
-                pyperclip.copy("")
-                ensure_wecom_foreground(main_hwnd)
-                interception.move_to(est_x3, est_y3)
-                time.sleep(0.1)
-                interception.click(button="left")
-                time.sleep(0.6)
-                result = pyperclip.paste()
-                if result and len(result.strip()) >= 10:
-                    if fingerprint and fingerprint not in result:
-                        print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
-                        trace.log(stage="copy_result", method=est_method3, fingerprint_match=False)
-                        return None
-                    trace.log(stage="copy_result", method=est_method3, result_len=len(result),
-                              fingerprint_match=True)
-                    return result.strip()
-                print("企微：底部合并区定位点击后剪贴板为空或过短，继续尝试滚动搜索。")
+    # Run this unconditionally after result-page context is confirmed —
+    # the action row may live entirely in bottom_action_bar and be absent
+    # from main_body OCR all_text.
+    from PIL import Image
+    t_lc = _time.time()
+    combined = copy_frame.full_image.crop((
+        0,
+        int(copy_frame.full_image.height * 0.70),
+        copy_frame.full_image.width,
+        copy_frame.full_image.height,
+    ))
+    combined_results = ocr_all_multi(combined, reader, 0.03)
+    combined_text = " ".join([t for _, t, _ in combined_results])
+    lower_has_actions = any(kw in combined_text for kw in _ACTION_SIGNALS)
+    trace.log(stage="copy_result", phase="lower_combined_search",
+              attempted=True,
+              combined_text_preview=combined_text[:200],
+              action_signals_found=lower_has_actions)
+    trace.log(stage="copy_result", phase="copy_timing",
+              step="lower_combined_ocr", elapsed_ms=_elapsed(t_lc))
+    if lower_has_actions:
+        combined_left = window_rect.left
+        combined_top = window_rect.top + int(height * 0.70)
+        est_x3, est_y3, est_method3, est_info3 = _estimate_copy_from_action_row(
+            combined_results, combined_left, combined_top,
+            combined.width, combined.height, trace,
+        )
+        trace.log(stage="copy_result", phase="action_row_geometry",
+                  action_row_visible=True, region="lower_combined", **est_info3)
+        if est_x3 is not None and est_y3 is not None:
+            print(f"企微：底部合并区几何定位 ({est_method3}) @ ({est_x3},{est_y3})，点击。")
+            pyperclip.copy("")
+            ensure_wecom_foreground(main_hwnd)
+            interception.move_to(est_x3, est_y3)
+            time.sleep(0.1)
+            interception.click(button="left")
+            time.sleep(0.6)
+            result = pyperclip.paste()
+            if result and len(result.strip()) >= 10:
+                if fingerprint and fingerprint not in result:
+                    print(f"企微：警告 — 复制结果中未找到采集指纹 {fingerprint}，可能是旧结果。")
+                    trace.log(stage="copy_result", method=est_method3, fingerprint_match=False)
+                    return None
+                trace.log(stage="copy_result", method=est_method3, result_len=len(result),
+                          fingerprint_match=True)
+                return result.strip()
+            print("企微：底部合并区定位点击后剪贴板为空或过短，继续尝试滚动搜索。")
+        else:
+            print("企微：底部合并区检测到操作信号但几何定位未产生有效候选，继续尝试滚动搜索。")
+    else:
+        print("企微：底部合并区未检测到操作区信号，将在滚动中搜索。")
 
     # ---- Scroll-assisted search ----
     # Each scroll pass saves OCR diagnostics and tries both direct "复制"
