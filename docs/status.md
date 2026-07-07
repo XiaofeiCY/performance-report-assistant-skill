@@ -21,6 +21,7 @@ Current state:
 
 - No pending Claude task.
 - WeCom Smart Summary bottom action bar copy-button fix has been accepted.
+- Project documentation reduction / stale-state cleanup has been completed on 2026-07-07.
 - Recent WeCom and output-safety work has been accepted and consolidated here.
 - Completed / deferred task handoff docs under `docs/tasks/` have been removed after consolidation.
 - Python cache under `performance-report-assistant/scripts/__pycache__/` has been removed again.
@@ -81,12 +82,6 @@ Validation result:
 - `py_compile`: PASS
 - `_validate_copy_fix.py`: 49 passed, 0 failed
 - `analyze_trace.py`: PASS on the retained A7K2 failure trace
-
-Completed task document deleted after status consolidation:
-
-```text
-docs/tasks/2026-07-07-wecom-copy-bottom-action-bar-fix.md
-```
 
 ## Recent Accepted Work
 
@@ -221,10 +216,19 @@ WeCom automation:
 
 Project reduction completed on 2026-07-07.
 
+Latest reduction pass completed on 2026-07-07:
+
+- Removed empty `docs/tasks/` directory after accepted task consolidation.
+- Refreshed `AGENTS.md` current state with the accepted bottom action bar copy-button fix.
+- Refreshed `performance-report-assistant/references/wecom-smart-summary-collector.md` so it no longer claims the deleted `outputs/wecom_runs/20260706-102206-RRI8/` run directory is retained.
+- Confirmed `outputs/` contains only the accepted report deliverables listed above.
+- Confirmed no `CLAUDE.md`, `AGENT.md`, `outputs/wecom_runs/`, or `performance-report-assistant/scripts/__pycache__/` project artifacts remain.
+
 Deleted in this cleanup:
 
 - Completed task handoff docs from `docs/tasks/`.
 - Deferred copy-stage task handoff doc after status consolidation.
+- Empty `docs/tasks/` directory after task consolidation.
 - Python cache directory `performance-report-assistant/scripts/__pycache__/`.
 - Old WeCom diagnostic run directory `outputs/wecom_runs/20260706-102206-RRI8/`.
 

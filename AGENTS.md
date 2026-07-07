@@ -48,6 +48,7 @@ Project collaboration, execution handoff, acceptance results, blockers, and next
 - No pending Claude task.
 - Recent output-location safety work is accepted.
 - Recent WeCom progress/diagnostics lifecycle work is accepted.
+- Recent WeCom bottom action bar copy-button fix is accepted.
 - Project reduction was completed on 2026-07-07.
 - Completed/deferred handoff docs under `docs/tasks/` were deleted after consolidation.
 - Python cache under `performance-report-assistant/scripts/__pycache__/` was deleted.
@@ -109,6 +110,7 @@ Recent accepted WeCom behavior:
 - Failed runs retain diagnostics and write `failure_summary.md`.
 - Cleanup must only touch the current run-specific diagnostics directory and must not delete final outputs or user files.
 - `--probe-only` is diagnostic by nature and may retain diagnostics.
+- Copy-stage bottom action bar fix is accepted: after current result-page context is verified, lower combined bottom-of-window search must run even when `main_body` OCR does not see result actions.
 
 ## Next Step Guidance
 
