@@ -152,6 +152,9 @@ Enterprise WeChat Smart Summary:
 - **Output location safety**: any WeCom mode that writes files (probe screenshots/OCR, full-auto diagnostics, semi-manual/manual markdown/JSON) must use absolute paths under the confirmed output root. The scripts now reject relative `--output`, `--output-json`, and `--screenshot-dir` paths. Pass explicit absolute paths to these options.
 - The product goal is supervised full automatic Smart Summary collection. The user authorizes and supervises, but the script should perform entering Smart Summary, creating the current summary, pasting the prompt, starting generation, waiting, copying, and saving. `--manual-input`, `--prompt-only`, and `--semi-manual` are fallback/debug paths only, not the recommended main path.
 - **New in this version**: `--probe-only` read-only diagnostic mode (capture, OCR, classify — no clicks/pastes/copies). Run this before first full-auto attempt to verify window detection and page classification. Must pass `--screenshot-dir` under the confirmed output root.
+- **Progress visibility**: invoke live collection with `python -u` so stage output flushes immediately and is visible to the supervising user.
+- **Diagnostics lifecycle**: `--diagnostics-policy on-failure` (default) cleans transient run diagnostics on success after md/json outputs are saved; `--diagnostics-policy keep` always retains diagnostics. Failed runs always keep diagnostics and generate a `failure_summary.md` in the run directory.
+- **Output vs diagnostics separation**: `--screenshot-dir` must be a run-specific diagnostic directory (e.g. `E:\confirmed-output\wecom_runs\<run-id>`), never the output root. `--output` and `--output-json` are final result files outside the run directory. This ensures cleanup never touches final outputs.
 - Current accepted probe boundary as of 2026-07-01: ordinary Enterprise WeChat chat/group pages must classify as `main_page`, not `summary_history_page`; non-WeCom foreground must fail safely; successful probe output uses `probe.png` plus same-source region screenshots.
 - After the user requests it, confirm the collection goal and report period. The default WeCom Smart Summary prompt body is fixed in `collect_wecom_smart_summary.py` as `DEFAULT_PROMPT_BODY`. To display the default prompt to the user during the confirmation step, run `python scripts/collect_wecom_smart_summary.py --prompt-only --period “<period>”` and show its output. Do not write or paraphrase a “default prompt” from memory — the output of `--prompt-only` is the only acceptable default prompt preview.
 - If the user wants a custom prompt, they must provide it explicitly (e.g. paste it, or point to a file via `--prompt-file`). The agent must not silently edit the canonical `DEFAULT_PROMPT_BODY` or present a rewritten version as the default. Custom prompts go through `--prompt-file`; the script's `load_prompt()` reads that file verbatim.
@@ -177,7 +180,7 @@ Enterprise WeChat Smart Summary:
 - 脚本不会发送、删除、编辑或转发任何消息；
 - 输出根目录为：[确认的输出目录]。
 
-诊断文件提醒：采集过程会在输出目录下生成截图、区域裁剪、OCR 文本、trace.jsonl 等诊断文件（约几十个文件）。这些仅用于失败诊断，不会出现在最终报告中。
+诊断文件提醒：采集过程会在输出目录下生成截图、区域裁剪、OCR 文本、trace.jsonl 等诊断文件。成功时默认自动清理（`--diagnostics-policy on-failure`）；失败时保留诊断并生成 `failure_summary.md`。
 
 确认无误后我再执行。请明确回复”确认执行企微采集”。
 ```
@@ -260,7 +263,7 @@ Before running a writing workflow, summarize what will be created:
 #### Safe defaults by operation
 
 - **Git statistics**: run without `--output` first (stdout only). Save to file only after output directory is confirmed.
-- **WeCom probe/full-auto**: require absolute `--screenshot-dir` under the confirmed output root. The script rejects missing or relative paths.
+- **WeCom probe/full-auto**: require absolute `--screenshot-dir` pointing to a run-specific diagnostic directory (e.g. `<output_root>/wecom_runs/<run-id>`), never the output root itself. The script rejects missing or relative paths. `--output` and `--output-json` are separate final result files outside the run directory.
 - **WeCom semi-manual/manual**: require absolute `--output` and `--output-json` under the confirmed output root. The script rejects relative paths.
 - **Template fill**: require absolute `--output` under the confirmed output root.
 - **Prompt-only mode** (`--prompt-only`): safe to run without output confirmation — it only prints to stdout.
