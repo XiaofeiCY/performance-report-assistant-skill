@@ -20,11 +20,73 @@ AGENT.md
 Current state:
 
 - No pending Claude task.
+- WeCom Smart Summary bottom action bar copy-button fix has been accepted.
 - Recent WeCom and output-safety work has been accepted and consolidated here.
 - Completed / deferred task handoff docs under `docs/tasks/` have been removed after consolidation.
 - Python cache under `performance-report-assistant/scripts/__pycache__/` has been removed again.
 - The old retained WeCom diagnostic run directory was removed after key trace facts were consolidated here.
 - Current report deliverables remain in `outputs/`.
+
+## WeCom Bottom Action Bar Copy Fix Accepted
+
+WeCom copy-stage failure investigated, fixed by Claude, and accepted on 2026-07-07.
+
+Failed run directory:
+
+```text
+C:\Users\Lenovo\Desktop\wecom_runs\20260707-104525-A7K2\
+```
+
+Note: the screenshot looked like `AZK2`, but the actual directory is `A7K2`.
+
+Fingerprint:
+
+```text
+PRAS-20260707-104607-9458
+```
+
+Observed result:
+
+- Generation completed and stabilized.
+- `wait_result` reached `result_detected`.
+- `before_copy.png` and `copy_scroll_1.png` show the result page with the bottom action row visible.
+- The bottom action row visibly contains the three actions: new smart document, send email, and copy.
+- `trace.jsonl` copy stage reported `has_result_actions=false`, then `method=none error=all_strategies_failed`.
+- `copy_scroll_1.png` was visually unchanged from `before_copy.png`; the scroll did not reveal a new copy target.
+
+Root cause from read-only analysis:
+
+- `_action_copy_result()` first builds `all_text` from `main_body` only.
+- `_action_row_visible` is therefore false when the action buttons live in `bottom_action_bar`.
+- The existing `lower_combined` bottom-of-window search is gated behind `_action_row_visible`, so it is skipped exactly when it is needed.
+- Offline OCR on `bottom_action_bar` alone returned no text, but OCR on the full image bottom 30 percent detected the action row and `_estimate_copy_from_action_row()` estimated the copy button at approximately `(564, 959)`.
+
+Accepted fix:
+
+- `performance-report-assistant/scripts/collect_wecom_smart_summary.py` now runs main-body lower geometry and lower combined bottom-of-window search without gating them on `_action_row_visible` from `main_body` OCR.
+- The lower combined search logs `lower_combined_search`, `combined_text_preview`, and `action_signals_found` diagnostics.
+- Copy clicks still require verified result-page context before the copy stage and exact clipboard fingerprint verification after clicking.
+- Forbidden strategies remain forbidden: no right-click copy, no unknown-area `Ctrl+A/Ctrl+C`, no multi-fixed-coordinate probing, no left-menu vertical scanning.
+
+Acceptance validation:
+
+```text
+python -m py_compile performance-report-assistant/scripts/collect_wecom_smart_summary.py
+python performance-report-assistant/scripts/_validate_copy_fix.py
+python performance-report-assistant/scripts/analyze_trace.py C:\Users\Lenovo\Desktop\wecom_runs\20260707-104525-A7K2\trace.jsonl
+```
+
+Validation result:
+
+- `py_compile`: PASS
+- `_validate_copy_fix.py`: 49 passed, 0 failed
+- `analyze_trace.py`: PASS on the retained A7K2 failure trace
+
+Completed task document deleted after status consolidation:
+
+```text
+docs/tasks/2026-07-07-wecom-copy-bottom-action-bar-fix.md
+```
 
 ## Recent Accepted Work
 
