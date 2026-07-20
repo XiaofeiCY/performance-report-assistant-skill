@@ -31,14 +31,14 @@
 - 客户反馈
 - 固定 Excel 表单
 
-普通 AI 生成 Excel 时很容易丢失原始模板样式，导致用户最后还要手动把内容复制回公司文件。这个 skill 采用更稳妥的流程：
+普通 AI 生成 Excel 时很容易丢失原始模板样式，导致用户最后还要手动把内容复制回公司文件。这个 skill 采用先预览、后决定是否导出的流程：
 
 1. 一步一步采访用户。
-2. 先读取 Excel 模板。
-3. 明确说明会修改哪些工作表、单元格或区域。
-4. 等用户确认后再执行。
-5. 写入原始模板的副本，而不是覆盖原文件。
-6. 最后返回生成文件的保存路径。
+2. 旧报告和模板默认只参考结构与表达，不作为本周期事实。
+3. 完整展示证据来源，包括手工材料、文件、git 和用户监督下的企微采集。
+4. 先在对话中生成完整内容并修改。
+5. 只有用户明确要求保存时，才确认格式和输出位置。
+6. 导出到固定模板时写入副本，不覆盖原文件。
 
 ## 核心特性
 
@@ -59,6 +59,7 @@ performance-report-assistant/
     openai.yaml
   references/
     intake-questions.md
+    git-evidence-rules.md
     report-patterns.md
     template-workflow.md
     excel-template-workflow.md
@@ -108,12 +109,11 @@ Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<你的�
 1. 选择材料类型：周报总结、月度绩效、季度复盘、述职材料、领导汇报或客户同步。
 2. 选择汇报对象：直属领导、管理层、跨部门伙伴、客户或非专业读者。
 3. 提供汇报周期。
-4. 如果有 Excel 模板，先提供模板。
-5. 让 agent 先读取模板，并提出明确的改动计划。
-6. 确认改动计划。
-7. 提供周报、工作记录、工单摘要或 git 仓库路径等证据。
-8. 生成汇报内容，并填写到模板副本中。
-9. 检查最终返回的文件保存路径。
+4. 提供空白模板、仅供格式参考的旧报告，或选择无模板；旧模板内容不会自动进入新报告。
+5. 多选本次证据来源：直接描述、粘贴文本、文件、git 仓库、用户监督下的企微智能总结，或暂无补充材料。
+6. 先在对话中查看并修改完整预览。
+7. 如需持久文件，再明确提出导出并确认绝对输出路径。
+8. 固定模板导出前确认具体填写位置，并写入原模板副本。
 
 ## Excel 模板安全策略
 
@@ -129,11 +129,13 @@ Copy-Item -Path ".\performance-report-assistant" -Destination "C:\Users\<你的�
 
 ### `collect_git_commits.py`
 
-从一个或多个 git 仓库按时间范围提取 commit，输出 Markdown 证据材料。
+从一个或多个 git 仓库按时间范围提取 commit。默认不传 `--output`，直接把证据打印到 stdout 供预览。
 
 ```bash
-python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01 --output commits.md
+python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01
 ```
+
+只有用户明确要求保存证据文件时，才增加 `--output <绝对路径>`。
 
 ### `fill_excel_template.py`
 

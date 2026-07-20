@@ -31,14 +31,14 @@ Many workplace reports are not written from scratch. They are assembled from sca
 - customer feedback,
 - and fixed Excel forms.
 
-Most AI-generated spreadsheets lose the original template style, which forces users to copy the content back into their company file manually. This skill focuses on a safer workflow:
+Most AI-generated spreadsheets lose the original template style, which forces users to copy the content back into their company file manually. This skill uses a preview-first workflow:
 
 1. Interview the user step by step.
-2. Inspect the Excel template before editing.
-3. Explain exactly which sheets, cells, or sections will be changed.
-4. Wait for user confirmation.
-5. Fill a copy of the original workbook.
-6. Return the final file path.
+2. Treat old reports and templates as structure/style references unless explicitly supplied as current evidence.
+3. Present the complete evidence menu, including manual material, files, git, and supervised WeCom collection.
+4. Draft and revise the report in the conversation.
+5. Ask about export format and location only when the user explicitly requests a persistent file.
+6. When exporting to a template, fill a copy rather than overwriting the original.
 
 ## Key Features
 
@@ -59,6 +59,7 @@ performance-report-assistant/
     openai.yaml
   references/
     intake-questions.md
+    git-evidence-rules.md
     report-patterns.md
     template-workflow.md
     excel-template-workflow.md
@@ -114,12 +115,11 @@ Use E:\path\to\performance-report-assistant as the skill and guide me through a 
 1. Choose the report type: weekly summary, monthly review, quarterly review, promotion review, leadership update, or customer update.
 2. Choose the audience: direct manager, senior leadership, cross-functional partners, customers, or non-expert stakeholders.
 3. Provide the reporting period.
-4. Provide an Excel template if one exists.
-5. Let the agent inspect the template and propose the exact edit plan.
-6. Confirm the edit plan.
-7. Provide evidence such as weekly notes, work logs, ticket summaries, or git repository paths.
-8. Generate the report and fill a copy of the template.
-9. Check the returned final file path.
+4. Provide a blank template, an old report as a formatting reference, or choose no template. Old template content is not current evidence.
+5. Select any current evidence sources: direct notes, pasted text, files, git repositories, supervised WeCom Smart Summary, or no additional source.
+6. Review and revise the full in-conversation preview.
+7. If a persistent artifact is needed, request export and confirm its absolute output path.
+8. For fixed templates, confirm the exact fields to change and fill a copy of the original.
 
 ## Excel Template Safety
 
@@ -135,11 +135,13 @@ When an Excel template is provided, the skill instructs the agent to:
 
 ### `collect_git_commits.py`
 
-Collect git commits across one or more repositories and output Markdown evidence.
+Collect git commits across one or more repositories. Without `--output`, evidence is printed to stdout for preview.
 
 ```bash
-python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01 --output commits.md
+python scripts/collect_git_commits.py --repo C:\path\repo --since 2026-05-01 --until 2026-06-01
 ```
+
+Add `--output <absolute-path>` only after the user explicitly requests a persistent evidence file.
 
 ### `fill_excel_template.py`
 
