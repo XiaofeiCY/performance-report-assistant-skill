@@ -468,35 +468,13 @@ check("save_ocr_multi(trace.ocr_path(f\"copy_scroll_" in script_text,
       "copy_scroll OCR saved per pass")
 
 # =====================================================================
-# Test 11: Safety boundaries — A7K2 failure run screenshots exist
+# Test 11: Bottom combined action-row pattern (self-contained)
 # =====================================================================
 print("=" * 60)
-print("Test 11: A7K2 failure run screenshots available for diagnosis")
+print("Test 11: Synthetic bottom combined OCR finds action row")
 
-A7K2_DIR = Path("C:/Users/Lenovo/Desktop/wecom_runs/20260707-104525-A7K2")
-
-a7k2_before_copy = A7K2_DIR / "before_copy.png"
-a7k2_before_copy_ocr = A7K2_DIR / "ocr" / "before_copy.txt"
-a7k2_mb = A7K2_DIR / "regions" / "before_copy-main_body.png"
-a7k2_ba = A7K2_DIR / "regions" / "before_copy-bottom_action_bar.png"
-a7k2_trace = A7K2_DIR / "trace.jsonl"
-a7k2_failure_summary = A7K2_DIR / "failure_summary.md"
-check(a7k2_before_copy.exists(), f"A7K2 before_copy.png exists")
-check(a7k2_before_copy_ocr.exists(), f"A7K2 ocr/before_copy.txt exists")
-check(a7k2_mb.exists(), f"A7K2 before_copy-main_body.png exists")
-check(a7k2_ba.exists(), f"A7K2 before_copy-bottom_action_bar.png exists")
-check(a7k2_trace.exists(), f"A7K2 trace.jsonl exists")
-check(a7k2_failure_summary.exists(), f"A7K2 failure_summary.md exists")
-
-
-# =====================================================================
-# Test 12: A7K2 bottom combined pattern
-# =====================================================================
-print("=" * 60)
-print("Test 12: A7K2 pattern — bottom combined OCR finds action row")
-
-# Simulate the A7K2 scenario:
-# - main_body all_text has NO action signals (as confirmed by A7K2 before_copy.txt)
+# Simulate the accepted fixed-bottom-action-row scenario:
+# - main_body all_text has NO action signals
 # - bottom 30% of full image (combined crop) DOES have action signals
 # - _action_row_visible from main_body OCR = False
 # - lower_has_actions from combined OCR = True
@@ -526,7 +504,7 @@ ax, ay, amethod, ainfo = _estimate_copy_from_action_row(
     region_width=1920, region_height=810, trace=trace_a,
 )
 check(ax is None and ay is None,
-      f"A7K2 main_body sim: no action signals → returns None "
+      f"Main-body simulation: no action signals → returns None "
       f"(got: ax={ax}, ay={ay}, method='{amethod}')")
 
 # Test B: bottom combined OCR has action signals
@@ -536,12 +514,12 @@ bx, by, bmethod, binfo = _estimate_copy_from_action_row(
     region_width=1920, region_height=int(1080 * 0.30), trace=trace_b,
 )
 check(bmethod == "geometry_merged_split",
-      f"A7K2 combined sim: method is geometry_merged_split (got: {bmethod})")
+      f"Combined simulation: method is geometry_merged_split (got: {bmethod})")
 check(bx is not None and by is not None,
-      f"A7K2 combined sim: returns valid screen coords ({bx}, {by})")
+      f"Combined simulation: returns valid screen coords ({bx}, {by})")
 # Screen y should be in the bottom 30% of the window
 check(by >= 1080 * 0.70,
-      f"A7K2 combined sim: y ({by}) in bottom 30% of window (expected >= {int(1080 * 0.70)})")
+      f"Combined simulation: y ({by}) in bottom 30% of window (expected >= {int(1080 * 0.70)})")
 
 # Test C: verify the critical control flow — when _action_row_visible=False
 # but lower_has_actions=True, the ungated code path enters the lower
@@ -557,7 +535,7 @@ check("combined_text_preview" in script_text2,
 check("action_signals_found" in script_text2,
       "Script logs action_signals_found in trace")
 
-print(f"  INFO: A7K2 combined sim copy at screen ({bx}, {by}) method={bmethod}")
+print(f"  INFO: combined simulation copy at screen ({bx}, {by}) method={bmethod}")
 print(f"  INFO: bottom combined search now runs regardless of _action_row_visible")
 
 
