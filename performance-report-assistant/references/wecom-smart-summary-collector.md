@@ -4,70 +4,72 @@ Enterprise WeChat Windows client Smart Summary collector.
 
 This collector is a user-supervised desktop automation path. Do not describe it as unattended, generally stable across environments, cross-platform, or compatible with all WeCom UI variants.
 
-## Current Status
+## Operational Baseline
 
-Current accepted report outputs:
+The collector has completed supervised end-to-end validation, but every future live run still requires fresh user
+authorization and active supervision. Preserve these implemented safeguards:
 
-```text
-outputs/wecom_summary_live_2026-06-29_2026-07-03.md
-outputs/wecom_summary_live_2026-06-29_2026-07-03.json
-```
-
-No WeCom diagnostic run directory is currently retained under project `outputs/`.
-The old successful diagnostic run below was deleted after key facts were consolidated into `docs/status.md`:
-
-```text
-outputs/wecom_runs/20260706-102206-RRI8/
-```
-
-Retained facts from that deleted successful run:
-
-```text
-fingerprint=PRAS-20260706-102206-5678
-automation_complete fingerprint_match=true
-copy method=lower_combined ocr_direct
-```
-
-Latest accepted copy-stage maintenance:
-
-```text
-2026-07-07 bottom action bar copy-button fix
-```
-
-Failed run investigated for that fix:
-
-```text
-C:\Users\Lenovo\Desktop\wecom_runs\20260707-104525-A7K2\
-```
-
-The current collector path has completed supervised end-to-end live runs, and the copy stage has been hardened for the fixed bottom action row where the copy action appears in the bottom bar. Do not describe this as unattended automation; any future live test still requires user supervision and explicit authorization.
-
-Accepted maintenance on 2026-07-06:
-
-- Windows keep-awake guard: supervised desktop automation temporarily requests system/display awake with `SetThreadExecutionState`, logs keep-awake events to the current run trace, and releases the request on process exit.
-- Console stage prompts: supervised automation prints terminal-only stage banners. No overlay, GUI, toast, or visual element may cover WeCom because visible UI can enter screenshots and affect OCR/template matching.
-- History/result page classification: old Smart Summary result pages with header fingerprint/prompt evidence can classify as `summary_history_page` so the existing trusted `+` new-summary path can proceed. Old fingerprints are history evidence only; final clipboard verification still requires the exact current fingerprint.
-
-Accepted maintenance on 2026-07-07:
-
-- Bottom action bar copy-button fix: after current result-page context is confirmed, the collector runs lower combined bottom-of-window search even when `main_body` OCR does not see result-action signals.
-- Copy-stage diagnostics include `lower_combined_search`, `combined_text_preview`, and `action_signals_found`.
-- Final clipboard verification still requires the exact current fingerprint.
+- temporarily request system/display awake during supervised automation and release it on exit;
+- print stage progress to the terminal with unbuffered Python (`python -u`); never display an overlay that could enter
+  screenshots or affect OCR;
+- treat old Smart Summary results and old fingerprints as history only, then use the trusted `+` path to create a new
+  current-period summary;
+- after current result-page context is confirmed, search the lower combined bottom-of-window action area even when
+  `main_body` OCR misses action signals;
+- retain `lower_combined_search`, `combined_text_preview`, and `action_signals_found` diagnostics;
+- require the exact current fingerprint in the final clipboard text.
 
 ## Supported Modes
 
 Primary path:
 
-- `desktop_automation`: supervised full-auto collection. User authorizes and supervises; script performs window recovery, Smart Summary entry, new summary creation, prompt paste, start click, result wait, copy, fingerprint verification, and Markdown/JSON save.
+- `desktop_automation`: supervised full-auto collection. User authorizes and supervises; script performs window
+  recovery, Smart Summary entry, new summary creation, prompt paste, start click, result wait, copy, and fingerprint
+  verification. The verified result prints to stdout by default; Markdown/JSON files are optional explicit exports.
 
 Diagnostic / fallback:
 
-- `--probe-only`: read-only diagnostic. It may find, foreground, and normalize the WeCom window, then capture screenshots, OCR regions, classify page state, and write trace output. It must not click business controls, paste, or copy.
-- `--prompt-only`: generate prompt and exit.
+- `--probe-only`: read-only diagnostic. It may find, foreground, and normalize the WeCom window, then capture screenshots, OCR regions, classify page state, and write trace output. It must not click business controls, paste, or copy. Requires explicit `--screenshot-dir`.
+- `--prompt-only`: generate prompt and exit. File-free.
 - `--semi-manual`: user handles WeCom manually.
 - `--manual-input`: user provides summary text; script only wraps Markdown/JSON.
 
 Manual, prompt-only, and semi-manual modes are fallback/debug paths, not the recommended main path when the user asks for supervised full-auto collection.
+
+## Preview-First Collection (Preferred Evidence Flow)
+
+The preferred flow for collecting WeCom Smart Summary as evidence within a report session does not create persistent Markdown/JSON files:
+
+```bash
+python -u scripts/collect_wecom_smart_summary.py --period "YYYY-MM-DD..YYYY-MM-DD"
+```
+
+This invocation:
+
+1. Auto-creates a run-specific diagnostic directory under the OS temporary directory (`%TEMP%\wecom_runs\<run-id>\`).
+2. Runs the full supervised automation (all safety gates active).
+3. Prints the verified result to stdout (no Markdown/JSON file created).
+4. On success, cleans the temporary diagnostics directory under the existing guarded cleanup logic.
+5. On failure, retains exactly one run-specific diagnostic bundle with `failure_summary.md` under the temp directory and reports its path.
+
+To save persistent Markdown/JSON result files, pass explicit `--output` and `--output-json` with absolute paths:
+
+```bash
+python -u scripts/collect_wecom_smart_summary.py --period "YYYY-MM-DD..YYYY-MM-DD" \
+  --output E:\confirmed-output\wecom.md \
+  --output-json E:\confirmed-output\wecom.json \
+  --screenshot-dir E:\confirmed-output\wecom_runs\<run-id>
+```
+
+To retain diagnostics on success, pass `--diagnostics-policy keep` with an explicit `--screenshot-dir`:
+
+```bash
+python -u scripts/collect_wecom_smart_summary.py --period "YYYY-MM-DD..YYYY-MM-DD" \
+  --screenshot-dir E:\confirmed-output\wecom_runs\<run-id> \
+  --diagnostics-policy keep
+```
+
+Agents must use `python -u` so stage output is visible to the supervising user.
 
 ## State Machine
 
@@ -93,7 +95,7 @@ ensure_wecom_foreground
 -> wait until current result evidence appears
 -> copy result from verified result page
 -> verify clipboard contains exact current fingerprint
--> save Markdown/JSON
+-> save Markdown/JSON (only when --output/--output-json provided)
 ```
 
 History result pages are not current evidence. If Smart Summary opens to an old result, the collector must create a new summary with the trusted `+` path before pasting the current prompt.
@@ -175,24 +177,46 @@ Forbidden:
 - unknown-area `Ctrl+A/Ctrl+C`;
 - right-click copy.
 
-## Diagnostics
+## Diagnostics Lifecycle
 
-Each run writes diagnostics under the configured `--screenshot-dir` or default output run directory:
+### Full-Auto Without Explicit --screenshot-dir (Preview/Evidence Flow)
 
-```text
-outputs/wecom_runs/<run-id>/
-  trace.jsonl
-  *.png
-  regions/*.png
-  ocr/*.txt
-```
+When `--screenshot-dir` is not provided, the script auto-creates a run-specific directory under the OS temporary directory (`%TEMP%\wecom_runs\<run-id>\`).
+
+- **Success**: diagnostics are cleaned automatically under the guarded `_cleanup_run_diagnostics` logic. The empty parent `wecom_runs` directory is also removed if it contains no other runs.
+- **Failure**: exactly one run-specific diagnostic directory is retained under `%TEMP%\wecom_runs\<run-id>\` with `trace.jsonl`, screenshots, OCR, region crops, and `failure_summary.md`. The path is printed to stdout.
+- No Markdown/JSON result files are created unless `--output`/`--output-json` are explicitly passed.
+
+### Full-Auto With Explicit --screenshot-dir
+
+When an explicit absolute `--screenshot-dir` is provided:
+
+- **`--diagnostics-policy on-failure` (default)**: cleans the run-specific diagnostic directory after successful output save and fingerprint verification. Cleanup is guarded by run-directory identity checks and final-output-file checks; it must not delete final outputs or user files.
+- **`--diagnostics-policy keep`**: always retains diagnostics.
+- Failed runs always keep diagnostics and write `failure_summary.md` in the run directory.
+
+### Probe-Only
+
+`--probe-only` is diagnostic by nature. It requires an explicit absolute `--screenshot-dir`. Diagnostics may be retained for inspection.
+
+### Cleanup Safety Gates
+
+`_cleanup_run_diagnostics` enforces:
+
+1. Rejects system/root/home/Desktop/Downloads/drive-root paths.
+2. Requires directory name matching `YYYYMMDD-HHMMSS-XXXX` run-id pattern, or parent named `wecom_runs` with `trace.jsonl` present.
+3. Rejects directories containing final output files (`.md`, `.json`, `.docx`, `.xlsx`, `.pptx`) except allowed diagnostics (`trace.jsonl`, `failure_summary.md`).
+
+Failure diagnostics must not be silently deleted before analysis. Cleanup after failure is a separate, explicitly authorized action.
+
+### Failure Reporting
 
 On failure, report:
 
 - current stage;
 - page state and confidence;
 - present and missing signals;
-- run directory;
+- run directory path;
 - whether retry is safe;
 - whether manual input is recommended.
 

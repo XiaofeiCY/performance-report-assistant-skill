@@ -2624,16 +2624,17 @@ def _print_countdown(seconds: int = 3) -> None:
     print(flush=True)
 
 
-def _require_explicit_output_dir(screenshot_dir: str, mode: str) -> None:
-    """Refuse to run a mode that writes diagnostic files without an explicit absolute --screenshot-dir.
+def _require_explicit_output_dir(screenshot_dir: str, mode: str, allow_auto: bool = False) -> None:
+    """Reject relative --screenshot-dir paths.  Missing paths are OK when *allow_auto* is True.
 
-    The default relative path is unsafe because the current working directory
-    may be an unrelated business repository.  Requiring an explicit absolute
-    directory ensures the user has consciously chosen where diagnostics land.
+    Relative paths are unsafe because the current working directory may be an
+    unrelated business repository.
     """
     if screenshot_dir and Path(screenshot_dir).is_absolute():
         return
     if not screenshot_dir:
+        if allow_auto:
+            return
         print(f"错误：{mode} 模式会生成截图、OCR 文本、trace 等诊断文件，必须通过 --screenshot-dir 指定绝对输出目录。")
     else:
         print(f"错误：--screenshot-dir 必须使用绝对路径，收到相对路径：{screenshot_dir}")
@@ -2642,6 +2643,21 @@ def _require_explicit_output_dir(screenshot_dir: str, mode: str) -> None:
     print()
     print("这样诊断文件不会意外写入当前工作目录（当前工作目录可能是无关的业务仓库）。")
     sys.exit(1)
+
+
+def _create_temp_run_dir() -> tuple[Path, str]:
+    """Create a run-specific diagnostic directory under the OS temporary directory.
+
+    Returns ``(run_dir, run_id)`` where *run_dir* is a path like
+    ``%TEMP%\\wecom_runs\\<run-id>\\`` and *run_id* is the generated
+    identifier (YYYYMMDD-HHMMSS-XXXX).  The caller is responsible for
+    cleanup (via `_cleanup_run_diagnostics`).
+    """
+    import tempfile
+    run_id = generate_run_id()
+    run_dir = Path(tempfile.gettempdir()) / "wecom_runs" / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir, run_id
 
 
 def run_probe_only(args: argparse.Namespace) -> int:
@@ -2836,15 +2852,16 @@ def _stage(msg: str) -> None:
     print("-" * 40, flush=True)
 
 
-def run_automation(args: argparse.Namespace) -> str:
-    _require_explicit_output_dir(args.screenshot_dir, "full-auto")
+def run_automation(args: argparse.Namespace, run_id: str = "") -> str:
+    _require_explicit_output_dir(args.screenshot_dir, "full-auto", allow_auto=True)
     require_windows()
     check_automation_dependencies()
 
     import easyocr
     import interception
 
-    run_id = generate_run_id()
+    if not run_id:
+        run_id = generate_run_id()
     fingerprint = generate_fingerprint()
     run_dir = Path(args.screenshot_dir)
 
@@ -3325,6 +3342,141 @@ def _cleanup_run_diagnostics(screenshot_dir: str) -> bool:
         return False
 
 
+def _cleanup_temp_if_empty(screenshot_dir: str) -> bool:
+    """Clean an auto-created temp directory ONLY when it is genuinely empty.
+
+    A directory is considered empty/unused when it contains no files at all
+    (empty subdirectories are tolerated — they are bootstrap artifacts from
+    mkdir before any diagnostics were written).
+
+    If *any* file exists — trace.jsonl, screenshots, OCR, region crops —
+    the directory has diagnostic evidence and must NOT be deleted merely
+    because failure_summary.md has not yet been written.
+
+    Also removes the parent wecom_runs directory if it becomes empty.
+
+    Returns True if the directory was removed.
+    """
+    rd = Path(screenshot_dir)
+    if not rd.is_dir():
+        return False
+
+    # Validate run-id naming pattern.
+    import re
+    run_id_pattern = re.compile(r"^\d{8}-\d{6}-[A-Z0-9]{4}$")
+    if not run_id_pattern.match(rd.name):
+        return False
+
+    # Canonicalize and verify the candidate is under OS TEMP/wecom_runs.
+    # The parent-name check alone is not enough — a directory shaped
+    # identically outside TEMP must not be deleted.  resolve() on Windows
+    # normalises case, junctions, and symlinks so the comparison is robust.
+    import tempfile as _tempfile_mod
+    try:
+        canonical_candidate = rd.resolve(strict=False)
+        canonical_temp_wecom = (
+            Path(_tempfile_mod.gettempdir()) / "wecom_runs"
+        ).resolve(strict=False)
+    except (OSError, RuntimeError):
+        # Resolution failure — cannot prove boundary safety.
+        return False
+
+    if canonical_candidate.parent != canonical_temp_wecom:
+        return False
+
+    # If failure_summary.md already exists, this is a handled failure — keep it.
+    if (rd / "failure_summary.md").exists():
+        return False
+
+    # Check for any diagnostic files.  A directory with files is NOT empty —
+    # it contains evidence that must be preserved.
+    for _entry in rd.rglob("*"):
+        if _entry.is_file():
+            # Directory has diagnostic content; do not delete.
+            return False
+
+    # Directory is truly empty (or contains only empty subdirs).  Safe to clean.
+    try:
+        shutil.rmtree(rd, ignore_errors=True)
+        # Clean empty parent wecom_runs
+        parent = rd.parent
+        if parent.exists() and parent.name.lower() == "wecom_runs":
+            try:
+                remaining = list(parent.iterdir())
+                if not remaining:
+                    parent.rmdir()
+            except Exception:
+                pass
+        return True
+    except Exception:
+        return False
+
+
+def _write_unhandled_failure_summary(
+    run_dir: str,
+    exc_type: type,
+    exc_value: BaseException,
+) -> None:
+    """Write failure_summary.md for an unhandled exception during automation.
+
+    Preserves existing diagnostics (trace, screenshots, OCR, regions) and
+    records structured failure information so the user can analyze the failure
+    without losing evidence.
+    """
+    import traceback as tb_mod
+
+    rd = Path(run_dir)
+    rd.mkdir(parents=True, exist_ok=True)
+
+    exc_name = exc_type.__name__ if exc_type else "Unknown"
+    exc_msg = str(exc_value) if exc_value else "(no message)"
+
+    lines = [
+        "# Automation Failure Summary",
+        "",
+        f"**Stage**: `unhandled_exception`",
+        f"**Exception type**: `{exc_name}`",
+        f"**Exception message**: {exc_msg}",
+        "",
+        "## Stack Trace",
+        "",
+        "```",
+    ]
+    if exc_value and exc_value.__traceback__:
+        lines.extend(
+            tb_mod.format_exception(
+                type(exc_value), exc_value, exc_value.__traceback__
+            )
+        )
+    else:
+        lines.append(f"{exc_name}: {exc_msg}")
+    lines.extend([
+        "```",
+        "",
+        "## Run Directory",
+        f"`{rd}`",
+        "",
+        "## Safe Next Steps",
+        "",
+        "1. Inspect the trace, screenshots, OCR, and region diagnostics in this directory.",
+        "2. The automation encountered an unexpected error and did not complete.",
+        "3. Retry is safe: a new run creates a fresh temporary directory.",
+        "4. If the error persists, use `--manual-input` to provide the summary text manually.",
+        "5. Do NOT delete this directory until the failure has been analyzed.",
+        "",
+        "## Diagnostics Preserved",
+        "",
+    ])
+    for entry in sorted(rd.rglob("*")):
+        if entry.is_file():
+            rel = entry.relative_to(rd)
+            lines.append(f"- `{rel}`")
+
+    (rd / "failure_summary.md").write_text(
+        "\n".join(lines), encoding="utf-8", errors="replace",
+    )
+
+
 def require_windows() -> None:
     if sys.platform != "win32":
         print("Error: Desktop automation requires Windows.")
@@ -3384,25 +3536,20 @@ def run_prompt_only(args: argparse.Namespace) -> int:
     print("3. 如果看到历史结果页，先点击左上 + 新建本次总结。")
     print('4. 粘贴提示词，点击"开始总结"。')
     print('5. 等待生成完成后，点击"复制"按钮。')
-    print("6. 运行以下命令保存结果：")
+    print("6. 将复制的结果通过 stdin 或 --manual-input 传回，结果打印到 stdout。")
     print()
+    print("默认流程：将企微复制的结果通过管道传回即可在对话中预览：")
     scenario = args.scenario
     period = args.period
+    print(f'  "粘贴智能总结结果" | python collect_wecom_smart_summary.py --manual-input '
+          f'--scenario {scenario} --period "{period}"')
+    print()
+    print("如果需要保存为持久文件（仅在用户明确要求导出时使用）：")
     output = args.output or "E:\\confirmed-output\\wecom_summary_manual.md"
     output_json = args.output_json or "E:\\confirmed-output\\wecom_summary_manual.json"
-    print(
-        f'  "粘贴智能总结结果" | python '
-        f'collect_wecom_smart_summary.py --manual-input '
-        f'--scenario {scenario} --period "{period}" '
-        f'--output {output} --output-json {output_json}'
-    )
-    print()
-    print("或者直接使用半自动模式：")
-    print(
-        f'  python collect_wecom_smart_summary.py --semi-manual '
-        f'--scenario {scenario} --period "{period}" '
-        f'--output {output} --output-json {output_json}'
-    )
+    print(f'  "粘贴智能总结结果" | python collect_wecom_smart_summary.py --manual-input '
+          f'--scenario {scenario} --period "{period}" '
+          f'--output {output} --output-json {output_json}')
     print()
     return 0
 
@@ -3603,11 +3750,50 @@ def main() -> int:
     if args.probe_only:
         return run_probe_only(args)
 
+    # ---- Preflight checks BEFORE temp dir creation ----
+    _temp_screenshot_dir = False
+    _auto_run_id = ""
+    if not args.manual_input:
+        require_windows()
+        check_automation_dependencies()
+        if not args.screenshot_dir:
+            _temp_run_dir, _auto_run_id = _create_temp_run_dir()
+            args.screenshot_dir = str(_temp_run_dir)
+            _temp_screenshot_dir = True
+
     if args.manual_input:
         raw_summary = read_manual_input(args)
         collection_method = "manual_input"
     else:
-        raw_summary = run_automation(args)
+        try:
+            raw_summary = run_automation(args, run_id=_auto_run_id)
+        except BaseException as _exc:
+            if _temp_screenshot_dir and args.screenshot_dir:
+                rd = Path(args.screenshot_dir)
+                # Check whether diagnostics were already written.
+                _has_diag = False
+                if rd.is_dir():
+                    _has_diag = any(
+                        entry.is_file() for entry in rd.rglob("*")
+                    )
+                if _has_diag:
+                    # Diagnostics exist — preserve them and write a structured
+                    # failure summary.  Do NOT delete evidence.
+                    _write_unhandled_failure_summary(
+                        str(rd), type(_exc), _exc,
+                    )
+                    print(
+                        f"企微：自动化发生未处理异常，诊断文件已保留在：{rd}",
+                        flush=True,
+                    )
+                    print(
+                        "企微：已生成 failure_summary.md，请检查诊断文件。",
+                        flush=True,
+                    )
+                else:
+                    # No diagnostics written — directory is unused, safe to clean.
+                    _cleanup_temp_if_empty(args.screenshot_dir)
+            raise
         collection_method = "desktop_automation"
 
     if args.output:
@@ -3624,6 +3810,16 @@ def main() -> int:
     if collection_method == "desktop_automation" and args.diagnostics_policy == "on-failure":
         if args.screenshot_dir:
             _cleanup_run_diagnostics(args.screenshot_dir)
+            # If we created the temp dir, also remove the parent wecom_runs dir if empty
+            if _temp_screenshot_dir:
+                parent = Path(args.screenshot_dir).parent
+                try:
+                    if parent.exists() and parent.name.lower() == "wecom_runs":
+                        remaining = list(parent.iterdir())
+                        if not remaining:
+                            parent.rmdir()
+                except Exception:
+                    pass
         else:
             print("企微：未提供 --screenshot-dir，跳过诊断清理。", flush=True)
     elif collection_method == "desktop_automation" and args.diagnostics_policy == "keep":

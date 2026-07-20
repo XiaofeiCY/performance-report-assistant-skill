@@ -18,7 +18,8 @@ Examples:
 
 - Do NOT fabricate template images. If no template file exists for a control,
   the automation will fall back to OCR and log a missing-template warning.
-- To create templates: run `--probe-only`, inspect the region screenshots in
-  the configured run diagnostics directory, such as
-  `outputs/wecom_runs/<run-id>/regions/`, crop the target control, and save it
-  here with the appropriate name.
+- To create templates: run `--probe-only` with an explicit absolute
+  `--screenshot-dir`, inspect its `regions/` screenshots, crop the target
+  control, and save it here with the appropriate name. Full-auto runs without
+  an explicit diagnostics path use `%TEMP%\wecom_runs\<run-id>\`; failed runs
+  retain that bundle, while successful runs clean it automatically.
