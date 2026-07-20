@@ -1,61 +1,50 @@
 # AGENTS.md
 
-## Project Recovery Entry
+## Recovery Entry
 
-Project path:
+Project: `E:\work\performance-report-assistant-skill`
 
-```text
-E:\work\performance-report-assistant-skill
-```
+Core skill: `performance-report-assistant/`
 
-Core skill path:
-
-```text
-performance-report-assistant/
-```
-
-After entering this project, read in order:
+Read in order:
 
 1. `AGENTS.md`
-2. `docs/status.md` top `Current Handoff Snapshot (2026-07-07)`
-3. If maintaining the WeCom collector, read `performance-report-assistant/references/wecom-smart-summary-collector.md`
-4. If working on report interview/generation behavior, read `performance-report-assistant/SKILL.md`
+2. `docs/status.md` top `Current Handoff Snapshot (2026-07-20)`
+3. For WeCom collector work, `performance-report-assistant/references/wecom-smart-summary-collector.md`
+4. For report interview/generation behavior, `performance-report-assistant/SKILL.md`
 
-Do not recreate:
+Do not recreate `CLAUDE.md` or `AGENT.md`. This is the only root recovery entry.
 
-```text
-CLAUDE.md
-AGENT.md
-```
+## Collaboration Workflow
 
-The user deleted those files. The only root recovery entry is `AGENTS.md`.
+For requirements, scope, acceptance, task breakdown, project status, or execution handoff:
 
-## Collaboration Rules
+1. Codex clarifies the objective, scope, constraints, risks, and acceptance criteria.
+2. Codex writes an executable task document for Claude.
+3. The user gives that document to Claude for implementation.
+4. Codex and the user verify Claude's result.
 
-When the user discusses requirements, product scope, acceptance criteria, task breakdown, project status, or execution handoff, Codex defaults to:
+Unless the user explicitly asks Codex to implement, fix, delete, or run an operation directly, Codex must not bypass
+the task-document handoff or modify implementation code. Read-only inspection, analysis, documentation, task dispatch,
+and acceptance are allowed.
 
-1. Understand and restate the need, including target, scope, constraints, risks, and acceptance criteria.
-2. Convert the need into a professional task document that can be handed to Claude.
-3. If Claude needs to execute work, first write/update project docs, then provide a copyable Claude prompt.
-4. After Claude finishes, help the user review and accept/reject the result.
+When Claude execution is needed, first update project documentation, then provide a copyable Claude prompt containing
+the entry files, task path, scope, exclusions, validation commands, and any supervised-operation prohibitions.
 
-Unless the user explicitly asks Codex to implement, fix, delete, or run an operation directly, Codex should not bypass task documentation and do Claude's implementation work.
-
-Project collaboration, execution handoff, acceptance results, blockers, and next plans must be reflected in `docs/status.md`. Ordinary Q&A should not create or update project files.
+Record material project decisions, handoffs, acceptance results, blockers, and next steps in `docs/status.md`. Do not
+create project documents for ordinary Q&A.
 
 ## Current State
 
 - No pending Claude task.
-- Recent output-location safety work is accepted.
-- Recent WeCom progress/diagnostics lifecycle work is accepted.
-- Recent WeCom bottom action bar copy-button fix is accepted.
-- Project reduction was completed on 2026-07-07.
-- Completed/deferred handoff docs under `docs/tasks/` were deleted after consolidation.
-- Python cache under `performance-report-assistant/scripts/__pycache__/` was deleted.
-- Old WeCom diagnostic run directory `outputs/wecom_runs/20260706-102206-RRI8/` was deleted after key facts were consolidated into `docs/status.md`.
-- Current accepted report outputs remain in `outputs/`.
+- The interview, template/reference isolation, preview-first output lifecycle, Git evidence, WeCom diagnostics, and
+  validator-safety refactor was accepted on 2026-07-20.
+- Project reduction was completed on 2026-07-20. Completed task history and installed-only test artifacts were removed
+  after consolidation into `docs/status.md`.
+- Source-backed files are synchronized to `C:\Users\Lenovo\.claude\skills\performance-report-assistant`.
+- Do not run WeCom full-auto without fresh user supervision and explicit authorization.
 
-Current retained report outputs:
+Retained accepted outputs:
 
 ```text
 outputs/weekly_report_2026-06-29_2026-07-03.md
@@ -64,56 +53,52 @@ outputs/wecom_summary_live_2026-06-29_2026-07-03.md
 outputs/wecom_summary_live_2026-06-29_2026-07-03.json
 ```
 
-## Current Evidence Rules
+These outputs are historical deliverables, not automatic evidence for a new period.
 
-Each new report interview/content-integration session must use the target period from the current interview as authoritative.
+## Standing Report Rules
 
-- Old windows, old WeCom summaries, old reports, old traces, old run directories, and old output files may be used as current evidence only when their period matches the current target period or the user explicitly asks to reuse them.
-- If old materials clearly belong to a different period, automatically exclude them from current evidence.
-- Period-mismatched materials may be used only as historical background, process validation records, or formatting/style references.
+- The current interview's exact target period is authoritative.
+- Old reports, outputs, WeCom results, traces, and git statistics are excluded from current evidence unless their period
+  matches or the user explicitly opts in.
+- Material explicitly called a template/reference is `reference_only`: use structure/style only, never its work facts.
+- Do not re-ask whether template data is usable after the user has classified it as a template/reference.
+- Present the complete evidence-source menu, including direct material, files, git, supervised WeCom collection, other
+  sources, and no additional evidence.
+- Default to an in-conversation preview. Ask for format and absolute output location only after an explicit export/save
+  request.
+- User templates and accepted drafts remain current-task references unless broader persistence is explicitly approved.
 
-## Template Memory Rules
+## WeCom Safety Rules
 
-This skill supports multiple users and multiple report templates.
+Allowed only during a supervised, explicitly authorized run:
 
-- User-provided templates, examples, and accepted drafts are current-task references by default.
-- Do not persist them as global/default templates unless the user explicitly agrees.
-
-## WeCom Collection Rules
-
-Enterprise WeChat Smart Summary automation may run only after the user explicitly requests it and supervises/authorizes the current run.
-
-Allowed:
-
-- foreground/normalize Enterprise WeChat;
-- screenshots, regional OCR, template matching;
-- Interception input;
-- add the current-run fingerprint to the prompt;
-- click verified targets;
-- read clipboard and verify the fingerprint.
+- foreground/normalize WeCom;
+- screenshots, regional OCR, and template matching;
+- prompt input with the current fingerprint;
+- verified target clicks, bounded result scrolling, clipboard read, and exact fingerprint verification.
 
 Forbidden:
 
 - send, delete, edit, or forward messages;
-- continue when Enterprise WeChat is not foreground;
+- continue while WeCom is not foreground;
 - click, paste, or copy before page state is verified;
-- right-click copy;
-- unknown-area `Ctrl+A/Ctrl+C`;
-- multi-fixed-coordinate probing;
-- left-menu vertical scanning;
+- right-click copy or unknown-area `Ctrl+A/Ctrl+C`;
+- multi-fixed-coordinate probing or left-menu vertical scanning;
 - clicking body URLs, quotes, attachments, or body center to obtain scroll focus.
 
-Recent accepted WeCom behavior:
+Operational requirements:
 
-- Live collection should be invoked with `python -u` so stage progress is visible.
-- `--diagnostics-policy on-failure` is the default: successful full-auto runs clean transient diagnostics after outputs are saved and fingerprint verification passes.
-- Failed runs retain diagnostics and write `failure_summary.md`.
-- Cleanup must only touch the current run-specific diagnostics directory and must not delete final outputs or user files.
-- `--probe-only` is diagnostic by nature and may retain diagnostics.
-- Copy-stage bottom action bar fix is accepted: after current result-page context is verified, lower combined bottom-of-window search must run even when `main_body` OCR does not see result actions.
+- run live collection with `python -u`;
+- default to stdout-first and `%TEMP%\wecom_runs\<run-id>` diagnostics;
+- clean only the current owned run after success;
+- retain failed diagnostics with `failure_summary.md`;
+- never delete failure diagnostics without separate authorization;
+- preserve lower combined action-bar search and exact final clipboard fingerprint verification.
 
-## Next Step Guidance
+If copying becomes unstable, obtain the failed run's `--screenshot-dir` and inspect `trace.jsonl`, `ocr/`, and
+`regions/` before proposing a fix.
 
-- Continuing the accepted weekly report: no further collection or git statistics are needed.
-- Starting a new report period: re-confirm report type, audience, period, template situation, output location, and evidence sources.
-- Maintaining the WeCom collector: read `performance-report-assistant/references/wecom-smart-summary-collector.md` first; do not run live automation unless the user again supervises and explicitly authorizes it.
+## Next Step
+
+- New report: reconfirm report type, audience, exact period, template role, and evidence sources; preview before export.
+- WeCom maintenance: read the collector reference first and do not run live automation without fresh authorization.
