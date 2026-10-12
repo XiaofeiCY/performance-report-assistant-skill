@@ -1242,6 +1242,29 @@ def classify_page_structured(
 # ---------------------------------------------------------------------------
 
 
+def _entry_label_matches(text: str) -> bool:
+    """Accept the navigation label, allowing OCR whitespace only."""
+    return "".join(text.split()) == "智能总结"
+
+
+def _entry_bounds_valid(bounds: tuple, rect: wintypes.RECT) -> bool:
+    left, top, right, bottom = bounds
+    # Navigation search envelope only; the click position comes from live evidence.
+    return (rect.left <= left < right <= rect.left + int((rect.right - rect.left) * 0.17)
+            and rect.top <= top < bottom <= rect.bottom)
+
+
+def _navigation_ocr(img: object, reader: object) -> list[tuple]:
+    """Enlarge small sidebar labels; convert evidence back to screen-image pixels."""
+    scale = 3
+    enlarged = img.resize((img.width * scale, img.height * scale))
+    rows = _rapid_ocr_all(enlarged, 0.3)
+    if not any(_entry_label_matches(text) for _bbox, text, _conf in rows):
+        rows = ocr_all(enlarged, reader, 0.3)
+    return [([[x / scale, y / scale] for x, y in bbox], text, conf)
+            for bbox, text, conf in rows]
+
+
 def _action_open_smart_summary_entry(
     main_hwnd: int,
     window_rect: wintypes.RECT,
@@ -1250,69 +1273,112 @@ def _action_open_smart_summary_entry(
 ) -> str:
     import interception
 
-    width = window_rect.right - window_rect.left
-    height = window_rect.bottom - window_rect.top
-
-    # Strategy A: UI Automation
+    candidates = {}
     try:
         import uiautomation as auto
-        root = auto.GetRootControl()
-        for win in root.GetChildren():
-            try:
-                if win.NativeWindowHandle == main_hwnd:
-                    for control, _depth in auto.WalkTree(win, lambda c, d: d < 6):
-                        try:
-                            name = (control.Name or "").strip()
-                            auto_id = (control.AutomationId or "").strip()
-                            if "智能总结" in name or "智能总结" in auto_id:
-                                rect = control.BoundingRectangle
-                                cx = rect.left + rect.width() // 2
-                                cy = rect.top + rect.height() // 2
-                                if cx > 0 and cy > 0:
-                                    print(f"企微：UIA 找到智能总结入口 @ ({cx},{cy})，点击。")
-                                    ensure_wecom_foreground(main_hwnd)
-                                    interception.move_to(cx, cy)
-                                    time.sleep(0.1)
-                                    interception.click(button="left")
-                                    time.sleep(1.5)
-                                    trace.log(stage="open_entry", method="uia", coords=(cx, cy))
-                                    return "reclassify"
-                        except Exception:
-                            continue
-            except Exception:
+        for win in auto.GetRootControl().GetChildren():
+            if win.NativeWindowHandle != main_hwnd:
                 continue
-    except ImportError:
-        pass
+            for control, _depth in auto.WalkControl(win, maxDepth=6):
+                if not _entry_label_matches(control.Name or ""):
+                    continue
+                if control.IsOffscreen or not control.IsEnabled:
+                    continue
+                r = control.BoundingRectangle
+                bounds = (r.left, r.top, r.right, r.bottom)
+                if _entry_bounds_valid(bounds, window_rect):
+                    candidates[bounds] = control
+    except Exception as exc:
+        trace.log(stage="open_entry", event="uia_unavailable", error=str(exc))
+        candidates = {}
 
-    # Strategy B: OCR in left sidebar area (verified foreground)
-    _verify_foreground_or_fail(main_hwnd, "WeWorkWindow", "open_entry_ocr", trace)
-    img = capture_rect(window_rect, trace.stage_screenshot("entry_ocr_scan"))
-    for bbox, text, _conf in ocr_all(img, reader, 0.15):
-        cx = int((bbox[0][0] + bbox[2][0]) / 2)
-        cy = int((bbox[0][1] + bbox[2][1]) / 2)
-        if cx < width * 0.35 and "智能总结" in text:
-            sx = window_rect.left + cx
-            sy = window_rect.top + cy
-            print(f"企微：OCR 找到智能总结入口 '{text}' @ ({sx},{sy})，点击。")
-            ensure_wecom_foreground(main_hwnd)
-            interception.move_to(sx, sy)
-            time.sleep(0.1)
-            interception.click(button="left")
-            time.sleep(1.5)
-            trace.log(stage="open_entry", method="ocr", text=text, coords=(sx, sy))
-            return "reclassify"
+    if len(candidates) > 1:
+        trace.log(stage="open_entry", event="ambiguous_entry", method="uia", count=len(candidates))
+        return "terminal_failure"
 
-    # Strategy C: Single calibrated probe (not a scan)
-    probe_x = window_rect.left + 31
-    probe_y = window_rect.top + int(height * 499 / 1080)
-    print(f"企微：UIA 和 OCR 均未找到入口，使用单点探针 ({probe_x},{probe_y})。")
-    ensure_wecom_foreground(main_hwnd)
-    interception.move_to(probe_x, probe_y)
-    time.sleep(0.1)
+    control = None
+    if candidates:
+        bounds, control = next(iter(candidates.items()))
+        method = "uia"
+    else:
+        frame = capture_trusted_frame(main_hwnd, window_rect, trace, "entry_navigation",
+                                      region_names=["app_sidebar"])
+        save_frame_artifacts(frame, trace, "entry_navigation")
+        matches = set()
+        rows = _navigation_ocr(frame.regions["app_sidebar"], reader)
+        _save_ocr_lines(trace.ocr_path("entry_navigation"), rows, "navigation")
+        for bbox, text, _conf in rows:
+            if not _entry_label_matches(text):
+                continue
+            bounds = (window_rect.left + int(min(pt[0] for pt in bbox)),
+                      window_rect.top + int(min(pt[1] for pt in bbox)),
+                      window_rect.left + int(max(pt[0] for pt in bbox)),
+                      window_rect.top + int(max(pt[1] for pt in bbox)))
+            if _entry_bounds_valid(bounds, window_rect):
+                matches.add(bounds)
+        if len(matches) != 1:
+            trace.log(stage="open_entry", event="entry_not_unique", method="ocr", count=len(matches))
+            print("企微：无法唯一定位可见的智能总结入口，已停止。请手动打开智能总结后重新运行。")
+            return "terminal_failure"
+        bounds = next(iter(matches))
+        method = "ocr"
+
+    # Bind the action to the exact selected window, not another WeCom window.
+    current = _window_rect(main_hwnd)
+    if (_root_window(user32.GetForegroundWindow()) != _root_window(main_hwnd)
+            or (current.left, current.top, current.right, current.bottom) !=
+               (window_rect.left, window_rect.top, window_rect.right, window_rect.bottom)):
+        trace.log(stage="open_entry", event="entry_window_changed")
+        return "terminal_failure"
+    if control is not None:
+        r = control.BoundingRectangle
+        if (control.IsOffscreen or not control.IsEnabled
+                or not _entry_label_matches(control.Name or "")
+                or (r.left, r.top, r.right, r.bottom) != bounds):
+            trace.log(stage="open_entry", event="entry_control_changed")
+            return "terminal_failure"
+    else:
+        # Re-read a fresh navigation crop immediately before the OCR click.
+        fresh = capture_trusted_frame(main_hwnd, window_rect, trace, "entry_recheck",
+                                      region_names=["app_sidebar"])
+        save_frame_artifacts(fresh, trace, "entry_recheck")
+        fresh_matches = set()
+        for bbox, text, _conf in _navigation_ocr(fresh.regions["app_sidebar"], reader):
+            if _entry_label_matches(text):
+                fresh_matches.add((window_rect.left + int(min(pt[0] for pt in bbox)),
+                                   window_rect.top + int(min(pt[1] for pt in bbox)),
+                                   window_rect.left + int(max(pt[0] for pt in bbox)),
+                                   window_rect.top + int(max(pt[1] for pt in bbox))))
+        if fresh_matches != {bounds}:
+            trace.log(stage="open_entry", event="entry_label_changed")
+            return "terminal_failure"
+
+    _verify_foreground_or_fail(main_hwnd, "WeWorkWindow", "entry_click", trace)
+    if _root_window(user32.GetForegroundWindow()) != _root_window(main_hwnd):
+        return "terminal_failure"
+    current = _window_rect(main_hwnd)
+    if (current.left, current.top, current.right, current.bottom) != (window_rect.left, window_rect.top, window_rect.right, window_rect.bottom):
+        return "terminal_failure"
+    cx, cy = (bounds[0] + bounds[2]) // 2, (bounds[1] + bounds[3]) // 2
+    interception.move_to(cx, cy)
     interception.click(button="left")
-    time.sleep(1.5)
-    trace.log(stage="open_entry", method="probe", coords=(probe_x, probe_y))
-    return "reclassify"
+    trace.log(stage="open_entry", method=method, coords=(cx, cy), bounds=bounds)
+
+    # A sidebar label is not proof of navigation success. Never click again here.
+    for attempt in range(3):
+        time.sleep(0.5)
+        current = _window_rect(main_hwnd)
+        frame = capture_trusted_frame(main_hwnd, current, trace, f"entry_verify_{attempt}")
+        save_frame_artifacts(frame, trace, f"entry_verify_{attempt}")
+        state = classify_page_structured(frame, reader, trace, f"entry_verify_{attempt}")
+        trace.log(stage="open_entry", event="entry_page_verification", **state)
+        if state.get("tainted") or state["state"] == "terminal_failure":
+            return "terminal_failure"
+        if state.get("in_smart_summary") and state["state"] in (
+                "summary_input_page", "summary_history_page", "summary_result_page", "summary_generating_page"):
+            return "reclassify"
+    print("企微：点击后未确认智能总结内容页，已停止。")
+    return "terminal_failure"
 
 
 def _action_click_plus(
@@ -2852,6 +2918,52 @@ def _stage(msg: str) -> None:
     print("-" * 40, flush=True)
 
 
+def run_entry_only(args: argparse.Namespace) -> int:
+    """Supervised entry acceptance; never paste, generate, copy, or clean diagnostics."""
+    require_windows()
+    check_automation_dependencies()
+    import easyocr
+    import interception
+
+    run_id = generate_run_id()
+    if args.screenshot_dir:
+        _require_explicit_output_dir(args.screenshot_dir, "entry-only")
+        run_dir = Path(args.screenshot_dir) / run_id
+        run_dir.mkdir(parents=True, exist_ok=False)
+    else:
+        run_dir, run_id = _create_temp_run_dir()
+    trace = TraceLogger(run_dir)
+    trace.log(event="entry_acceptance_start", run_id=run_id)
+    print("入口验收：仅定位、点击智能总结并验证页面；不粘贴、不生成、不复制。", flush=True)
+    print(f"诊断目录：{run_dir}", flush=True)
+    try:
+        main_hwnd, rect, _children = find_best_wecom_window()
+        if main_hwnd is None or rect is None:
+            raise RuntimeError("未找到企业微信窗口")
+        _print_countdown(3)
+        rect = normalize_window(main_hwnd)
+        if rect is None:
+            raise RuntimeError("无法将企业微信置前")
+        interception.auto_capture_devices()
+        print("正在加载 OCR，随后测试入口定位。", flush=True)
+        reader = easyocr.Reader(["ch_sim", "en"])
+        # The actual entry action is shared with full-auto, not reimplemented.
+        result = _action_open_smart_summary_entry(main_hwnd, rect, reader, trace)
+        if result != "reclassify":
+            raise RuntimeError("入口定位或内容页验证失败")
+        trace.log(event="entry_acceptance_complete", status="success")
+        print("入口验收通过：已定位入口并确认智能总结内容页。", flush=True)
+        print(f"诊断已保留：{run_dir}", flush=True)
+        return 0
+    except BaseException as exc:
+        _write_failure_summary(str(exc), "entry_acceptance", str(run_dir))
+        trace.log(event="entry_acceptance_failed", error=str(exc))
+        print(f"入口验收未通过：{exc}。诊断已保留：{run_dir}", flush=True)
+        if isinstance(exc, KeyboardInterrupt):
+            raise
+        return 1
+
+
 def run_automation(args: argparse.Namespace, run_id: str = "") -> str:
     _require_explicit_output_dir(args.screenshot_dir, "full-auto", allow_auto=True)
     require_windows()
@@ -3034,7 +3146,9 @@ def run_automation(args: argparse.Namespace, run_id: str = "") -> str:
         if page_state == "main_page":
             print(f"企微：当前为主聊天页（恢复第 {recovery_cycles} 次），尝试打开智能总结入口。")
             clear_ocr_cache()
-            _action_open_smart_summary_entry(main_hwnd, window_rect, reader, trace)
+            result = _action_open_smart_summary_entry(main_hwnd, window_rect, reader, trace)
+            if result == "terminal_failure":
+                _save_diagnostics_and_exit("智能总结入口定位或进入验证失败，请手动打开后重试。", "open_entry", str(run_dir))
             main_hwnd, window_rect, children = find_best_wecom_window()
             if main_hwnd is None:
                 _save_diagnostics_and_exit("打开入口后未找到企业微信窗口。", "open_entry", str(run_dir))
@@ -3714,6 +3828,8 @@ def main() -> int:
                         help="Generate and print the WeCom Smart Summary prompt, then exit (no desktop automation).")
     parser.add_argument("--probe-only", action="store_true",
                         help="Read-only diagnostic mode: capture, OCR, classify; no clicks, pastes, or copies.")
+    parser.add_argument("--entry-only", action="store_true",
+                        help="Supervised entry acceptance only: locate/click/verify Smart Summary; no paste, generation, or copy.")
     parser.add_argument("--from-clipboard", action="store_true", help="With --manual-input: read text from clipboard.")
     parser.add_argument("--screenshot-dir", default="",
                         help="Absolute path for diagnostic run directory (required for probe/full-auto modes).")
@@ -3731,6 +3847,12 @@ def main() -> int:
     parser.add_argument("--global-budget-seconds", type=int, default=GLOBAL_BUDGET_SECONDS_DEFAULT,
                         help="Global time budget for the entire automation run (default 300).")
     args = parser.parse_args()
+
+    if args.entry_only:
+        if any((args.prompt_only, args.probe_only, args.semi_manual, args.manual_input,
+                args.output, args.output_json, args.from_clipboard)):
+            parser.error("--entry-only cannot be combined with other modes or result outputs")
+        return run_entry_only(args)
 
     # Require absolute paths for all file-writing outputs.
     # The current working directory may be an unrelated business repository.

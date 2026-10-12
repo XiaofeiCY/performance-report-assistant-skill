@@ -1,5 +1,22 @@
 # Project Status
 
+## Current Collaboration Update (2026-10-12)
+
+- The user explicitly assigned this WeCom Smart Summary iteration to Codex for direct implementation; the user will perform acceptance. This overrides the default Claude handoff for this iteration only.
+- Current phase: navigation entry implementation and supervised entry-only test accepted by the user on 2026-10-12. The user authorized committing and pushing this iteration to the remote. No full summary collection was performed.
+- Per-run live WeCom collection still requires fresh explicit authorization and active user supervision. Implementation authorization alone does not authorize a live collection run.
+- Initial code inspection found review candidates: a calibrated fixed entry probe after UIA/OCR failure; proportional input targeting when OCR hints are missing; old diagnostic cleanup when reusing an explicit run directory; stage-boundary rather than continuously enforced global timeout checks.
+- Approved scope: replace fixed entry probe with exact visible UIA/OCR label localization, recheck before clicking, verify the destination content page, and stop on missing/ambiguous/changed targets. No changes to generation, copying, input targeting, diagnostic cleanup, or timeout policy.
+- Implementation: UIA searches only the selected window and navigation envelope; OCR uses a dedicated navigation crop rather than summary history. OCR labels are re-read before clicking. Destination checks are bounded to three attempts without repeated clicks. Entry failures are propagated to the main state machine.
+- Offline navigation validation: 9 tests passed, covering reordered positions, missing/partial/ambiguous labels, foreground changes, label changes, wrong destination, tainted screenshot, and UIA success. Existing copy regression: 43 passed, 0 failed. Python syntax compilation passed.
+- Broader preview-first contract validation was attempted but aborted with Windows PermissionError in its sandbox temporary directory; it did not complete and is not counted as passed. Diff whitespace check passed.
+- The user subsequently requested direct execution for acceptance of the entry feature. Added `--entry-only` to execute the shared entry action without prompt paste, summary generation, clipboard access, or diagnostic cleanup. No full collection is authorized by this request.
+- Live findings and fixes: sandbox execution could not foreground WeCom; execution outside the sandbox could. Corrected the UIA traversal call to `WalkControl(maxDepth=6)` after inspecting the installed API. EasyOCR missed small navigation labels; a saved-image check confirmed RapidOCR recognition, so navigation OCR now enlarges labels 3x, prioritizes RapidOCR, and converts coordinates back to original pixels.
+- Updated navigation regression after live fixes: 10 tests passed, including enlarged-image coordinate conversion. Diff whitespace check passed.
+- Successful run: `C:\Users\Lenovo\AppData\Local\Temp\wecom_runs\20261012-104343-0JQK`. Shared entry action used OCR, clicked the detected label, and classified the destination as `summary_input_page`. Final state: Smart Summary input page; no prompt pasted, generation started, or results copied. Failed diagnostics were retained without cleanup.
+- Remaining limitation: navigation search still uses the left 17% envelope; hidden/renamed entries or large structural redesigns stop safely and require manual entry. Offline mocks do not establish live UI compatibility.
+- Next step: commit and push the accepted iteration. Actual hidden/ambiguous-entry live scenarios have not been exercised; their fail-safe behavior is covered by offline mocks. The installed Claude skill has not been synchronized by this iteration. Full collection regression and installed-skill synchronization remain follow-ups outside this commit/push request. The July baseline below remains historical.
+
 ## Current Handoff Snapshot (2026-07-20)
 
 Project entry: `AGENTS.md`

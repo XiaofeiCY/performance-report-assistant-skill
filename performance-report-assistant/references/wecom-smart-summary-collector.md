@@ -29,6 +29,8 @@ Primary path:
 
 Diagnostic / fallback:
 
+- `--entry-only`: supervised acceptance of navigation only. Finds and maximizes WeCom, invokes the same entry localization/click/content-page verification as full-auto, then exits. Never pastes a prompt, starts generation, copies results, or deletes diagnostics. Diagnostics are retained in a fresh temporary run directory, or a fresh child of explicit `--screenshot-dir`. Start from an ordinary WeCom page to validate actual entry navigation. Example: `python -u scripts/collect_wecom_smart_summary.py --entry-only`.
+
 - `--probe-only`: read-only diagnostic. It may find, foreground, and normalize the WeCom window, then capture screenshots, OCR regions, classify page state, and write trace output. It must not click business controls, paste, or copy. Requires explicit `--screenshot-dir`.
 - `--prompt-only`: generate prompt and exit. File-free.
 - `--semi-manual`: user handles WeCom manually.
@@ -101,6 +103,8 @@ ensure_wecom_foreground
 History result pages are not current evidence. If Smart Summary opens to an old result, the collector must create a new summary with the trusted `+` path before pasting the current prompt.
 
 ## Region Model
+
+Navigation entry localization is independent of the summary history list: search visible controls named exactly `智能总结` within the target window and left navigation envelope, then fall back to OCR of the visible `app_sidebar` crop. Whitespace in OCR labels is ignored; partial names and multiple distinct targets are rejected. No fixed-coordinate entry probe or menu scrolling is allowed. Recheck the target and window before clicking, then require a recognized Smart Summary content page within three bounded checks. Failure stops the run and retains diagnostics. The navigation envelope remains the left 17% of the window; hidden, renamed, or radically redesigned navigation requires manual entry.
 
 The collector uses normalized window-relative regions instead of full-window OCR as the main loop:
 
